@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     WHATSAPP_FROM: str = ""
     TWILIO_SID: str = ""
     TWILIO_AUTH: str = ""
+    RESEND_API_KEY: str = ""
 
     class Config:
         env_file = ".env"
