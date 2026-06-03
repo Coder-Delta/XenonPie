@@ -20,7 +20,10 @@ def _save(hashes: set):
 
 
 def _job_fingerprint(job: dict) -> str:
-    key = f"{job.get('title','').lower().strip()}|{job.get('organization','').lower().strip()}|{job.get('last_date','')}"
+    title = (job.get("title") or "unknown").lower().strip()
+    org = (job.get("organization") or "unknown").lower().strip()
+    last_date = job.get("last_date") or ""
+    key = f"{title}|{org}|{last_date}"
     return hashlib.sha256(key.encode()).hexdigest()
 
 

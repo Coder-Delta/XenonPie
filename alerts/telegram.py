@@ -21,7 +21,7 @@ async def send_telegram_alert(message: str, user_id: str | None = None, chat_id:
     payload = {
         "chat_id": target,
         "text": message,
-        "parse_mode": "Markdown",
+        "parse_mode": "HTML",
         "disable_web_page_preview": False,
     }
 
