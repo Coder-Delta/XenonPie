@@ -3,15 +3,18 @@ from loguru import logger
 from scrapers import scrape_url, parse_feed, has_changed
 from streams.producer import push_raw_job
 from streams.consumer import consume_raw_jobs, consume_alerts
+import yaml
 
-SOURCES = [
-    {"type": "web",  "url": "https://ssc.nic.in"},
-    {"type": "feed", "url": "https://www.sarkariresult.com/feed/"},
-]
+def load_sources():
+    with open("config/sources.yaml") as f:
+        data = yaml.safe_load(f)
+    return data["sources"]
+
+SOURCES = load_sources()
 
 USER_PROFILES = [
     {
-        "user_id": "user_001",
+        "user_id": "8939136566",
         "categories": ["central_govt", "bank", "railway"],
         "education_level": "graduate",
         "states": ["all_india", "west_bengal"],
