@@ -3,6 +3,7 @@ from .extractor import extract_job_details
 from .classifier import classify_job
 from .dedup import is_duplicate
 from .ranker import rank_job
+from .search_agent import enrich_job_details
 
 
 async def process_raw_job(raw: dict, user_profiles: list[dict]) -> list[dict]:
@@ -27,6 +28,9 @@ async def process_raw_job(raw: dict, user_profiles: list[dict]) -> list[dict]:
 
     # Step 2: Classify
     job = classify_job(job)
+
+    # Step 2.5: Enrich missing fields via Gemini search
+    job = await enrich_job_details(job)
 
     # Step 3: Dedup
     if is_duplicate(job):

@@ -3,3 +3,4 @@ from .extractor import extract_job_details
 from .classifier import classify_job
 from .dedup import is_duplicate
 from .ranker import rank_job
+from .search_agent import enrich_job_details

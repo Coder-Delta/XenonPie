@@ -55,6 +55,8 @@ async def extract_job_details(text: str) -> dict | None:
 async def _fallback_gemini(text: str) -> dict | None:
     try:
         import google.generativeai as genai
+        import asyncio
+
         genai.configure(api_key=settings.GEMINI_API_KEY)
         model = genai.GenerativeModel("gemini-1.5-flash")
 
@@ -66,5 +68,20 @@ async def _fallback_gemini(text: str) -> dict | None:
         return data
 
     except Exception as e:
-        logger.error(f"Gemini fallback failed: {e}")
+        error_str = str(e)
+
+        if "rate_limit_exceeded" in error_str or "429" in error_str:
+            import re
+
+            match = re.search(r"try again in (\d+)m", error_str)
+            wait = int(match.group(1)) * 60 + 10 if match else 60
+
+            logger.warning(
+                f"Groq rate limit hit, waiting {wait}s then trying Gemini..."
+            )
+
+            await asyncio.sleep(2)  # don't wait, just fallback immediately
+            return await _fallback_gemini(text)
+
+        logger.error(f"Extractor error: {e}")
         return None
