@@ -1,274 +1,513 @@
 sources:
-  # ── Central Govt ──
-  - name: SSC
-    url: https://ssc.nic.in
-    type: web
-    category: central_govt
+  # ══════════════════════════════════════
+  # HIGH QUALITY FEEDS (best structured data)
+  # ══════════════════════════════════════
+  - name: Sarkari Result
+    url: https://www.sarkariresult.com/feed/
+    type: feed
 
-  - name: UPSC
-    url: https://upsc.gov.in
-    type: web
-    category: central_govt
+  - name: Rojgar Result
+    url: https://www.rojgarresult.com/feed/
+    type: feed
 
-  - name: NCS Jobs
-    url: https://www.ncs.gov.in
-    type: web
-    category: central_govt
+  - name: Freejobalert
+    url: https://www.freejobalert.com/feed/
+    type: feed
 
-  - name: Employment News
-    url: https://employmentnews.gov.in
-    type: web
-    category: central_govt
+  - name: Sarkari Naukri Blog
+    url: https://www.sarkarinaukriblog.com/feeds/posts/default
+    type: feed
 
-  - name: India Gov Jobs
-    url: https://www.india.gov.in/my-government/indian-government-portals/employment
-    type: web
-    category: central_govt
+  - name: Naukri Name
+    url: https://www.naukriname.com/feed/
+    type: feed
 
-  # ── Railway ──
-  - name: RRB Official
-    url: https://www.rrbcdg.gov.in
-    type: web
-    category: railway
+  - name: Freshers World
+    url: https://www.freshersworld.com/feed
+    type: feed
 
-  - name: RRB NTPC
-    url: https://www.rrbntpc.gov.in
-    type: web
-    category: railway
+  - name: Jobs Alert
+    url: https://www.jobsalert.in/feeds/posts/default
+    type: feed
 
-  - name: Indian Railways
-    url: https://indianrailways.gov.in
-    type: web
-    category: railway
+  - name: Rojgar Samachar
+    url: https://www.rojgarsamachar.com/feed/
+    type: feed
 
-  - name: RailRecruit
-    url: https://www.rrcnr.org
-    type: web
-    category: railway
+  - name: Govt Jobs 2026
+    url: https://www.govtjobs2026.com/feeds/posts/default
+    type: feed
 
-  # ── Banking ──
+  - name: Sarkari Job
+    url: https://www.sarkarijob.com/feed/
+    type: feed
+
+  - name: India Govt Jobs
+    url: https://www.indiagovtjobs.in/feeds/posts/default
+    type: feed
+
+  - name: Sarkari Exam
+    url: https://www.sarkariexam.com/feed/
+    type: feed
+
+  - name: Employment News Feed
+    url: https://employmentnews.gov.in/NewFeed.xml
+    type: feed
+
+  # ══════════════════════════════════════
+  # CENTRAL GOVT
+  # ══════════════════════════════════════
+  - name: SSC Exam Schedule
+    url: https://ssc.nic.in/Portal/SchemeExamSchedule
+    type: web
+
+  - name: UPSC Active Exams
+    url: https://upsc.gov.in/examinations/active-examinations
+    type: web
+
+  - name: RRB CDG
+    url: https://www.rrbcdg.gov.in/latest-news.html
+    type: web
+
   - name: IBPS
-    url: https://www.ibps.in
+    url: https://www.ibps.in/recruitment-notification/
     type: web
-    category: bank
 
   - name: SBI Careers
-    url: https://bank.sbi/web/careers
+    url: https://bank.sbi/web/careers/current-openings
     type: web
-    category: bank
 
   - name: RBI Opportunities
     url: https://www.rbi.org.in/Scripts/Opportunities.aspx
     type: web
-    category: bank
 
-  - name: NABARD
-    url: https://www.nabard.org/careers.aspx
-    type: web
-    category: bank
-
-  - name: LIC Careers
-    url: https://licindia.in/careers
-    type: web
-    category: bank
-
-  # ── Defence ──
-  - name: Indian Army
-    url: https://joinindianarmy.nic.in
-    type: web
-    category: defence
-
-  - name: Indian Navy
-    url: https://www.joinindiannavy.gov.in
-    type: web
-    category: defence
-
-  - name: Indian Air Force
-    url: https://afcat.cdac.in
-    type: web
-    category: defence
-
-  - name: UPSC CDS
-    url: https://www.upsc.gov.in/examinations/active-examinations
-    type: web
-    category: defence
-
-  # ── PSU ──
-  - name: ONGC
-    url: https://ongcindia.com/careers
-    type: web
-    category: psu
-
-  - name: BHEL
-    url: https://www.bhel.com/careers
-    type: web
-    category: psu
-
-  - name: NTPC
-    url: https://www.ntpc.co.in/en/human-resources/careers
-    type: web
-    category: psu
-
-  - name: SAIL
-    url: https://www.sail.co.in/en/careers
-    type: web
-    category: psu
-
-  - name: PGCIL
-    url: https://www.powergrid.in/career
-    type: web
-    category: psu
-
-  - name: BPCL
-    url: https://www.bharatpetroleum.in/careers
-    type: web
-    category: psu
-
-  - name: HPCL
-    url: https://hindustanpetroleum.com/careers
-    type: web
-    category: psu
-
-  - name: GAIL
-    url: https://www.gailonline.com/career.html
-    type: web
-    category: psu
-
-  - name: Coal India
-    url: https://www.coalindia.in/en-us/career/recruitment.aspx
-    type: web
-    category: psu
-
-  - name: HAL
-    url: https://hal-india.co.in/Careers
-    type: web
-    category: psu
-
-  # ── State PSC ──
-  - name: WBPSC
-    url: https://www.pscwb.org.in
-    type: web
-    category: state_govt
-
-  - name: UPPSC
-    url: https://uppsc.up.nic.in
-    type: web
-    category: state_govt
-
-  - name: BPSC
-    url: https://www.bpsc.bih.nic.in
-    type: web
-    category: state_govt
-
-  - name: MPSC
-    url: https://mpsc.gov.in
-    type: web
-    category: state_govt
-
-  - name: RPSC
-    url: https://rpsc.rajasthan.gov.in
-    type: web
-    category: state_govt
-
-  - name: TNPSC
-    url: https://www.tnpsc.gov.in
-    type: web
-    category: state_govt
-
-  - name: KPSC
-    url: https://kpsc.kar.nic.in
-    type: web
-    category: state_govt
-
-  - name: MPPSC
-    url: https://mppsc.mp.gov.in
-    type: web
-    category: state_govt
-
-  - name: HPSC
-    url: https://hpsc.gov.in
-    type: web
-    category: state_govt
-
-  - name: JPSC
-    url: https://www.jpsc.gov.in
-    type: web
-    category: state_govt
-
-  - name: OPSC
-    url: https://opsc.gov.in
-    type: web
-    category: state_govt
-
-  - name: UPSSSC
-    url: https://upsssc.gov.in
-    type: web
-    category: state_govt
-
-  # ── Teaching / Education ──
-  - name: UGC
-    url: https://ugcnetonline.in
-    type: web
-    category: teaching
-
-  - name: KVS Careers
-    url: https://kvsangathan.nic.in/careers
-    type: web
-    category: teaching
-
-  - name: NVS Careers
+  - name: NVS Recruitment
     url: https://navodaya.gov.in/nvs/en/Recruitment
     type: web
-    category: teaching
+
+  - name: KVS Recruitment
+    url: https://kvsangathan.nic.in
+    type: web
 
   - name: DSSSB
     url: https://dsssb.delhi.gov.in
     type: web
-    category: teaching
 
-  # ── Police ──
-  - name: SSC CPO
-    url: https://ssc.nic.in
+  - name: Indian Army
+    url: https://joinindianarmy.nic.in
     type: web
-    category: police
 
-  - name: CISF
-    url: https://www.cisf.gov.in/recruitment
+  - name: Indian Navy
+    url: https://www.joinindiannavy.gov.in
     type: web
-    category: police
 
-  - name: BSF Recruitment
-    url: https://bsf.gov.in/recruitment.html
+  - name: DRDO RAC
+    url: https://rac.gov.in/index.php?option=com_content&view=article&id=10&Itemid=20
     type: web
-    category: police
 
-  - name: CRPF
-    url: https://crpf.gov.in/recruitment.htm
+  - name: ISRO
+    url: https://www.isro.gov.in/Careers.html
     type: web
-    category: police
 
-  # ── RSS / Feed sources ──
-  - name: Sarkari Result Feed
-    url: https://www.sarkariresult.com/feed/
-    type: feed
-    category: central_govt
+  - name: HAL
+    url: https://hal-india.co.in/Careers
+    type: web
 
-  - name: Freshers World Feed
-    url: https://www.freshersworld.com/feed
-    type: feed
-    category: central_govt
+  - name: PGCIL
+    url: https://www.powergrid.in/career
+    type: web
 
-  - name: Govt Jobs Feed
-    url: https://www.govtjobsforyou.com/feeds/posts/default
-    type: feed
-    category: central_govt
+  - name: Coal India
+    url: https://www.coalindia.in/en-us/career/recruitment.aspx
+    type: web
 
-  - name: Rojgar Result Feed
-    url: https://www.rojgarresult.com/feed/
-    type: feed
-    category: central_govt
+  - name: NABARD
+    url: https://www.nabard.org/careers.aspx
+    type: web
 
-  - name: Naukri Govt Feed
-    url: https://www.naukrigovernment.in/feed/
-    type: feed
-    category: central_govt
+  # ══════════════════════════════════════
+  # PANCHAYAT / GRAM SEVAK / LOW POSTS
+  # ══════════════════════════════════════
+  - name: Panchayat Raj UP
+    url: https://panchayatiraj.up.nic.in
+    type: web
+
+  - name: Panchayat WB
+    url: https://wbprd.gov.in
+    type: web
+
+  - name: Panchayat Bihar
+    url: https://panchayati.bihar.gov.in
+    type: web
+
+  - name: Panchayat MP
+    url: https://www.prd.mp.gov.in
+    type: web
+
+  - name: Panchayat Rajasthan
+    url: https://panchayat.rajasthan.gov.in
+    type: web
+
+  - name: Panchayat Maharashtra
+    url: https://rdprd.maharashtra.gov.in
+    type: web
+
+  - name: Panchayat Gujarat
+    url: https://www.panchayat.gujarat.gov.in
+    type: web
+
+  - name: Panchayat Odisha
+    url: https://panchayatiraj.odisha.gov.in
+    type: web
+
+  - name: Panchayat Jharkhand
+    url: https://panchayat.jharkhand.gov.in
+    type: web
+
+  - name: Panchayat Chhattisgarh
+    url: https://panchayat.cg.gov.in
+    type: web
+
+  # ══════════════════════════════════════
+  # STATE PSC — ALL STATES
+  # ══════════════════════════════════════
+
+  # West Bengal
+  - name: WBPSC
+    url: https://www.pscwb.org.in/index.php?option=com_advertisement&Itemid=138
+    type: web
+
+  - name: WBSSC
+    url: https://www.wbssc.gov.in
+    type: web
+
+  - name: WBPSC Misc
+    url: https://wbpsc.gov.in
+    type: web
+
+  # Uttar Pradesh
+  - name: UPPSC
+    url: https://uppsc.up.nic.in/Public/Pages/1/AdvertisementPage.aspx
+    type: web
+
+  - name: UPSSSC
+    url: https://upsssc.gov.in
+    type: web
+
+  - name: UP Police
+    url: https://uppbpb.gov.in
+    type: web
+
+  # Bihar
+  - name: BPSC
+    url: https://www.bpsc.bih.nic.in/Notices.html
+    type: web
+
+  - name: BSSC
+    url: https://bssc.bihar.gov.in
+    type: web
+
+  - name: Bihar Police
+    url: https://csbc.bihar.gov.in
+    type: web
+
+  # Rajasthan
+  - name: RPSC
+    url: https://rpsc.rajasthan.gov.in/advt
+    type: web
+
+  - name: RSSB
+    url: https://rssb.rajasthan.gov.in
+    type: web
+
+  - name: Rajasthan Police
+    url: https://police.rajasthan.gov.in/recruitmentnotification.aspx
+    type: web
+
+  # Madhya Pradesh
+  - name: MPPSC
+    url: https://mppsc.mp.gov.in/en/advertisements
+    type: web
+
+  - name: MPESB
+    url: https://esb.mp.gov.in
+    type: web
+
+  - name: MP Police
+    url: https://www.mppolice.gov.in/en/recruitment
+    type: web
+
+  # Maharashtra
+  - name: MPSC
+    url: https://mpsc.gov.in
+    type: web
+
+  - name: Maharashtra Police
+    url: https://mahapolice.gov.in/mahapolice/jsp/temp/recruitment.jsp
+    type: web
+
+  - name: ZP Maharashtra
+    url: https://zp.maharashtra.gov.in
+    type: web
+
+  # Tamil Nadu
+  - name: TNPSC
+    url: https://www.tnpsc.gov.in/notifications.html
+    type: web
+
+  - name: TN Police
+    url: https://www.tnusrb.tn.gov.in
+    type: web
+
+  - name: TN TRB
+    url: https://www.trb.tn.nic.in
+    type: web
+
+  # Karnataka
+  - name: KPSC
+    url: https://kpsc.kar.nic.in
+    type: web
+
+  - name: KSSB
+    url: https://kssb.karnataka.gov.in
+    type: web
+
+  - name: Karnataka Police
+    url: https://ksp.karnataka.gov.in/page/Recruitment/en
+    type: web
+
+  # Andhra Pradesh
+  - name: APPSC
+    url: https://psc.ap.gov.in/APPSC/
+    type: web
+
+  - name: APSSB
+    url: https://apssb.nic.in
+    type: web
+
+  # Telangana
+  - name: TSPSC
+    url: https://www.tspsc.gov.in/TSPSC/
+    type: web
+
+  - name: TS Police
+    url: https://www.tslprb.in
+    type: web
+
+  # Gujarat
+  - name: GPSC
+    url: https://gpsc.gujarat.gov.in/Advertisement
+    type: web
+
+  - name: GSSSB
+    url: https://gsssb.gujarat.gov.in
+    type: web
+
+  - name: Gujarat Police
+    url: https://www.gujarat-police.gov.in/recruitment.htm
+    type: web
+
+  # Haryana
+  - name: HPSC
+    url: https://hpsc.gov.in
+    type: web
+
+  - name: HSSC
+    url: https://www.hssc.gov.in
+    type: web
+
+  - name: Haryana Police
+    url: https://haryanapolicerecruitment.gov.in
+    type: web
+
+  # Punjab
+  - name: PPSC
+    url: https://ppsc.gov.in/advt.aspx
+    type: web
+
+  - name: PSSSB
+    url: https://sssb.punjab.gov.in
+    type: web
+
+  # Himachal Pradesh
+  - name: HPPSC
+    url: https://hppsc.hp.gov.in/advt
+    type: web
+
+  - name: HPSSSB
+    url: https://hpsssb.hp.gov.in
+    type: web
+
+  # Uttarakhand
+  - name: UKPSC
+    url: https://ukpsc.gov.in/pages/advertisements
+    type: web
+
+  - name: UKSSSC
+    url: https://sssc.uk.gov.in
+    type: web
+
+  # Jharkhand
+  - name: JPSC
+    url: https://www.jpsc.gov.in/pages/advertisement.php
+    type: web
+
+  - name: JSSC
+    url: https://jssc.nic.in
+    type: web
+
+  # Odisha
+  - name: OPSC
+    url: https://opsc.gov.in/Advt.aspx
+    type: web
+
+  - name: OSSC
+    url: https://ossc.gov.in
+    type: web
+
+  - name: Odisha Police
+    url: https://odishapolice.gov.in/recruitment
+    type: web
+
+  # Chhattisgarh
+  - name: CGPSC
+    url: https://psc.cg.gov.in/advertisement.html
+    type: web
+
+  - name: CGVYAPAM
+    url: https://vyapam.cgstate.gov.in
+    type: web
+
+  # Assam
+  - name: APSC
+    url: https://apsc.nic.in/recruitments
+    type: web
+
+  - name: SLRC Assam
+    url: https://slrc-assam.org
+    type: web
+
+  # Kerala
+  - name: Kerala PSC
+    url: https://www.keralapsc.gov.in/notifications
+    type: web
+
+  # Goa
+  - name: GPSC Goa
+    url: https://gpsc.goa.gov.in
+    type: web
+
+  # J&K
+  - name: JKSSB
+    url: https://jkssb.nic.in/advertisement.html
+    type: web
+
+  - name: JKPSC
+    url: https://jkpsc.nic.in
+    type: web
+
+  # North East
+  - name: MPSC Manipur
+    url: https://mpscmanipur.gov.in
+    type: web
+
+  - name: MPSC Meghalaya
+    url: https://mpsc.nic.in
+    type: web
+
+  - name: NPSC Nagaland
+    url: https://npsc.nagaland.gov.in
+    type: web
+
+  - name: SPSC Sikkim
+    url: https://spsc.gov.in
+    type: web
+
+  - name: TPSC Tripura
+    url: https://tpsc.gov.in
+    type: web
+
+  # ══════════════════════════════════════
+  # MUNICIPAL / DISTRICT / GRAM LEVEL
+  # ══════════════════════════════════════
+  - name: Delhi MCD
+    url: https://mcdonline.nic.in/portal/recruitment
+    type: web
+
+  - name: NMMC
+    url: https://www.nmmc.gov.in/recruitment
+    type: web
+
+  - name: BMC Mumbai
+    url: https://portal.mcgm.gov.in/irj/portal/anonymous/qlrecruitment
+    type: web
+
+  - name: PCMC Pune
+    url: https://www.pcmcindia.gov.in/recruitment.php
+    type: web
+
+  - name: BBMP Bangalore
+    url: https://bbmp.gov.in/recruitments
+    type: web
+
+  - name: GHMC Hyderabad
+    url: https://www.ghmc.gov.in/recruitment.aspx
+    type: web
+
+  - name: CMC Kolkata
+    url: https://www.kmcgov.in/KMCPortal/outside/UserRegistrationPage.do
+    type: web
+
+  # ══════════════════════════════════════
+  # HEALTH / NHM (low posts — ANM, CHO etc)
+  # ══════════════════════════════════════
+  - name: NHM UP
+    url: https://upnrhm.gov.in/recruitment.php
+    type: web
+
+  - name: NHM Bihar
+    url: https://statehealthsocietybihar.org/recruitment
+    type: web
+
+  - name: NHM WB
+    url: https://www.wbhealth.gov.in/pages/notification
+    type: web
+
+  - name: NHM MP
+    url: https://www.nhmmp.gov.in/Recruitment.aspx
+    type: web
+
+  - name: NHM Rajasthan
+    url: https://rajswasthya.nic.in/recruitment.htm
+    type: web
+
+  - name: NHM Maharashtra
+    url: https://nrhm.maharashtra.gov.in/1261/Recruitments
+    type: web
+
+  # ══════════════════════════════════════
+  # RAILWAY ZONE WISE
+  # ══════════════════════════════════════
+  - name: RRB ALP CDG
+    url: https://www.rrbcdg.gov.in/latest-news.html
+    type: web
+
+  - name: RRC Eastern Railway
+    url: https://www.rrcer.com/recruitment.html
+    type: web
+
+  - name: RRC Northern Railway
+    url: https://www.rrcnr.org/Recruitments.aspx
+    type: web
+
+  - name: RRC Western Railway
+    url: https://www.rrc-wr.com/recruitment.html
+    type: web
+
+  - name: RRC Southern Railway
+    url: https://www.rrcmas.in/recruitment.php
+    type: web
+
+  - name: RRC Central Railway
+    url: https://rrccr.com/recruitment.php
+    type: web
