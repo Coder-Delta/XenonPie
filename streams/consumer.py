@@ -63,7 +63,7 @@ async def consume_raw_jobs(user_profiles: list[dict], batch: int = 10):
                         raw = json.loads(fields["data"])
                         results = await process_raw_job(raw, user_profiles)
 
-                        from queue.producer import push_alert
+                        from streams.producer import push_alert
                         for job in results:
                             await push_alert(job)
 

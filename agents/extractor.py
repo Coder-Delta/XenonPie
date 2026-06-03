@@ -32,7 +32,7 @@ async def extract_job_details(text: str) -> dict | None:
         prompt = EXTRACT_PROMPT.format(text=text[:4000])
 
         response = client.chat.completions.create(
-            model="llama3-70b-8192",
+            model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.1,
             max_tokens=1000,

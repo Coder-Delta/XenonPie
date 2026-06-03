@@ -1,49 +1,37 @@
 from loguru import logger
-from groq import Groq
-from config.settings import settings
-
-client = Groq(api_key=settings.GROQ_API_KEY)
-
-CATEGORIES = [
-    "central_govt", "state_govt", "psu", "bank",
-    "railway", "defence", "police", "teaching", "other"
-]
-
-EDUCATION_LEVELS = ["10th", "12th", "diploma", "graduate", "postgraduate", "phd"]
 
 
 def classify_job(job: dict) -> dict:
-    text = f"{job.get('title','')} {job.get('organization','')} {job.get('eligibility','')}"
+    title = job.get("title") or ""
+    org = job.get("organization") or ""
+    eligibility = job.get("eligibility") or ""
+    text = f"{title} {org} {eligibility}"
 
-    category = _classify_category(text)
-    education = _classify_education(job.get("eligibility", ""))
-    state = _extract_state(job.get("location", ""))
+    job["category_tag"] = _classify_category(text)
+    job["education_level"] = _classify_education(eligibility)
+    job["state_tag"] = _extract_state(job.get("location") or "")
 
-    job["category_tag"] = category
-    job["education_level"] = education
-    job["state_tag"] = state
-
-    logger.info(f"Classified: {job.get('title')} → {category} | {education} | {state}")
+    logger.info(f"Classified: {title} → {job['category_tag']} | {job['education_level']} | {job['state_tag']}")
     return job
 
 
 def _classify_category(text: str) -> str:
     text = text.lower()
-    if any(k in text for k in ["railway", "rrb", "rer"]):
+    if any(k in text for k in ["railway", "rrb"]):
         return "railway"
-    if any(k in text for k in ["bank", "sbi", "ibps", "rbi"]):
+    if any(k in text for k in ["bank", "sbi", "ibps", "rbi", "lic", "hfl"]):
         return "bank"
-    if any(k in text for k in ["defence", "army", "navy", "airforce", "military"]):
+    if any(k in text for k in ["defence", "army", "navy", "airforce"]):
         return "defence"
-    if any(k in text for k in ["police", "constable", "ssp"]):
+    if any(k in text for k in ["police", "constable"]):
         return "police"
-    if any(k in text for k in ["teacher", "professor", "lecturer", "school"]):
+    if any(k in text for k in ["teacher", "professor", "lecturer", "tet", "jhtet"]):
         return "teaching"
-    if any(k in text for k in ["psu", "ongc", "bhel", "sail", "ntpc", "bpcl"]):
+    if any(k in text for k in ["psu", "ongc", "bhel", "pgcil", "ntpc", "bpcl", "sgpgi"]):
         return "psu"
-    if any(k in text for k in ["upsc", "ssc", "central", "ministry", "union"]):
+    if any(k in text for k in ["upsc", "ssc", "central", "ministry"]):
         return "central_govt"
-    if any(k in text for k in ["state", "psc", "district", "municipality"]):
+    if any(k in text for k in ["upsssc", "bpsc", "uppsc", "psc", "state", "district"]):
         return "state_govt"
     return "other"
 
