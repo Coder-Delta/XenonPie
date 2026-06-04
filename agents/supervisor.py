@@ -1,3 +1,4 @@
+from datetime import date
 from loguru import logger
 from .extractor import extract_job_details
 from .classifier import classify_job
@@ -32,11 +33,21 @@ async def process_raw_job(raw: dict, user_profiles: list[dict]) -> list[dict]:
     # Step 2.5: Enrich missing fields via Gemini search
     job = await enrich_job_details(job)
 
-    # Step 3: Dedup
+    # Step 3: Skip expired jobs
+    last_date = job.get("last_date")
+    if last_date and last_date != "N/A":
+        try:
+            if date.fromisoformat(last_date) < date.today():
+                logger.info(f"Skipping expired job: {job['title']} (last_date: {last_date})")
+                return []
+        except Exception:
+            pass
+
+    # Step 4: Dedup
     if is_duplicate(job):
         return []
 
-    # Step 4: Rank per user
+    # Step 5: Rank per user
     results = []
     for profile in user_profiles:
         ranked = rank_job(job.copy(), profile)

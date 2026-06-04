@@ -1,20 +1,17 @@
 import json
 import asyncio
-import google.generativeai as genai
+from google import genai
 from loguru import logger
 from config.settings import settings
 
-genai.configure(api_key=settings.GEMINI_API_KEY)
-
+client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
 SEARCH_PROMPT = """
 You are a government job information finder for India.
-
 A job was found with this partial info:
 Title: {title}
 Organization: {organization}
 Category: {category}
-
 Search your knowledge and fill in ALL missing fields. Return ONLY valid JSON:
 {{
   "title": "{title}",
@@ -29,10 +26,8 @@ Search your knowledge and fill in ALL missing fields. Return ONLY valid JSON:
   "selection_process": "<written/interview/physical>",
   "official_website": "<URL>"
 }}
-
 Return ONLY JSON, no explanation.
 """
-
 
 async def enrich_job_details(job: dict) -> dict:
     title = job.get("title") or ""
@@ -54,15 +49,16 @@ async def enrich_job_details(job: dict) -> dict:
         return job
 
     logger.info(f"Enriching {title} — missing: {missing}")
-
     try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
         prompt = SEARCH_PROMPT.format(
             title=title,
             organization=org,
             category=category
         )
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt
+        )
         raw = response.text.strip().replace("```json", "").replace("```", "").strip()
         enriched = json.loads(raw)
 

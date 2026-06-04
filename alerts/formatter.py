@@ -19,12 +19,16 @@ def format_alert(job: dict) -> str:
         try:
             deadline = datetime.fromisoformat(last_date).date()
             days_left = (deadline - date.today()).days
-            if days_left <= 3:
+            if days_left < 0:
+                urgency = "⚫ EXPIRED\n"
+            elif days_left <= 3:
                 urgency = f"🔴 URGENT — only {days_left} days left!\n"
             elif days_left <= 7:
                 urgency = f"🟠 {days_left} days left\n"
             elif days_left <= 15:
                 urgency = f"🟡 {days_left} days left\n"
+            else:
+                urgency = f"🟢 {days_left} days left\n"
         except Exception:
             pass
 
@@ -32,7 +36,6 @@ def format_alert(job: dict) -> str:
 🏛 <b>{title}</b>
 🏢 {org}
 📂 {category}
-
 👥 Vacancies: {vacancies}
 🎓 Eligibility: {eligibility}
 📍 Location: {location}
@@ -40,8 +43,6 @@ def format_alert(job: dict) -> str:
 📅 Last Date: {last_date}
 {urgency}
 ⭐ Match Score: {score}/100
-
 🔗 {apply_link}
 """.strip()
-
     return message
