@@ -455,3 +455,199 @@ sources:
   - name: RRC Central Railway
     url: https://rrccr.com/recruitment.php
     type: web
+
+  # ══════════════════════════════════════
+  # STARTUPS / PRIVATE TECH COMPANIES
+  # ══════════════════════════════════════
+
+  - name: Wellfound Jobs
+    url: https://wellfound.com/jobs
+    type: web
+
+  - name: YC Startup Jobs
+    url: https://www.ycombinator.com/jobs
+    type: web
+
+  - name: Hacker News Jobs
+    url: https://news.ycombinator.com/jobs
+    type: web
+
+  # Greenhouse Boards
+
+  - name: Razorpay Careers
+    url: https://boards.greenhouse.io/razorpay
+    type: web
+
+  - name: Postman Careers
+    url: https://boards.greenhouse.io/postman
+    type: web
+
+  - name: BrowserStack Careers
+    url: https://boards.greenhouse.io/browserstack
+    type: web
+
+  - name: CoinSwitch Careers
+    url: https://boards.greenhouse.io/coinswitch
+    type: web
+
+  - name: Apollo.io Careers
+    url: https://boards.greenhouse.io/apolloio
+    type: web
+
+  # Lever Boards
+
+  - name: Zepto Careers
+    url: https://jobs.lever.co/zepto
+    type: web
+
+  - name: Groww Careers
+    url: https://jobs.lever.co/groww
+    type: web
+
+  - name: Urban Company Careers
+    url: https://jobs.lever.co/urbancompany
+    type: web
+
+  # Indian Tech Companies
+
+  - name: Swiggy Careers
+    url: https://careers.swiggy.com
+    type: web
+
+  - name: Zomato Careers
+    url: https://www.zomato.com/careers
+    type: web
+
+  - name: CRED Careers
+    url: https://careers.cred.club
+    type: web
+
+  - name: PhonePe Careers
+    url: https://www.phonepe.com/careers
+    type: web
+
+  - name: Meesho Careers
+    url: https://www.meesho.io/jobs
+    type: web
+
+  - name: Flipkart Careers
+    url: https://www.flipkartcareers.com
+    type: web
+
+  - name: Myntra Careers
+    url: https://careers.myntra.com
+    type: web
+
+  - name: Ola Careers
+    url: https://careers.olacabs.com
+    type: web
+
+  - name: Rapido Careers
+    url: https://rapido.breezy.hr
+    type: web
+
+  # Big Tech
+
+  - name: Google Careers
+    url: https://careers.google.com/jobs/results
+    type: web
+
+  - name: Microsoft Careers
+    url: https://jobs.careers.microsoft.com
+    type: web
+
+  - name: Amazon Jobs
+    url: https://www.amazon.jobs
+    type: web
+
+  - name: Adobe Careers
+    url: https://careers.adobe.com
+    type: web
+
+  - name: Salesforce Careers
+    url: https://careers.salesforce.com
+    type: web
+
+  - name: IBM Careers
+    url: https://www.ibm.com/careers
+    type: web
+
+  - name: Oracle Careers
+    url: https://careers.oracle.com
+    type: web
+
+  # Consulting / IT Services
+
+  - name: TCS Careers
+    url: https://www.tcs.com/careers
+    type: web
+
+  - name: Infosys Careers
+    url: https://career.infosys.com
+    type: web
+
+  - name: Wipro Careers
+    url: https://careers.wipro.com
+    type: web
+
+  - name: HCL Careers
+    url: https://www.hcltech.com/careers
+    type: web
+
+  - name: Tech Mahindra Careers
+    url: https://careers.techmahindra.com
+    type: web
+
+  - name: Cognizant Careers
+    url: https://careers.cognizant.com
+    type: web
+
+  - name: Capgemini Careers
+    url: https://www.capgemini.com/careers
+    type: web
+
+  - name: Accenture Careers
+    url: https://www.accenture.com/in-en/careers
+    type: web
+
+  # X Hiring Sources
+
+  - name: Razorpay X
+    username: Razorpay
+    type: x
+
+  - name: Groww X
+    username: Groww
+    type: x
+
+  - name: Zepto X
+    username: ZeptoNow
+    type: x
+
+  - name: CRED X
+    username: CRED_club
+    type: x
+
+  - name: Swiggy X
+    username: Swiggy
+    type: x
+
+  - name: Zomato X
+    username: zomato
+    type: x
+
+  - name: PhonePe X
+    username: PhonePe
+    type: x
+
+  - name: Meesho X
+    username: Meesho_Official
+    type: x
+
+  - name: Postman X
+    username: getpostman
+    type: x
+
+  - name: BrowserStack X
+    username: browserstack
+    type: x
