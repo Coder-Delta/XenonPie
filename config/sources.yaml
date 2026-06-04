@@ -26,10 +26,6 @@ sources:
     url: https://www.freshersworld.com/feed
     type: feed
 
-  - name: Jobs Alert
-    url: https://www.jobsalert.in/feeds/posts/default
-    type: feed
-
   - name: Rojgar Samachar
     url: https://www.rojgarsamachar.com/feed/
     type: feed
@@ -40,10 +36,6 @@ sources:
 
   - name: Sarkari Job
     url: https://www.sarkarijob.com/feed/
-    type: feed
-
-  - name: India Govt Jobs
-    url: https://www.indiagovtjobs.in/feeds/posts/default
     type: feed
 
   - name: Sarkari Exam
@@ -82,7 +74,7 @@ sources:
     type: web
 
   - name: NVS Recruitment
-    url: https://navodaya.gov.in/nvs/en/Recruitment
+    url: https://navodaya.gov.in/nvs/en/Home-1/Recruitment
     type: web
 
   - name: KVS Recruitment
@@ -136,10 +128,6 @@ sources:
     url: https://wbprd.gov.in
     type: web
 
-  - name: Panchayat Bihar
-    url: https://panchayati.bihar.gov.in
-    type: web
-
   - name: Panchayat MP
     url: https://www.prd.mp.gov.in
     type: web
@@ -148,24 +136,8 @@ sources:
     url: https://panchayat.rajasthan.gov.in
     type: web
 
-  - name: Panchayat Maharashtra
-    url: https://rdprd.maharashtra.gov.in
-    type: web
-
   - name: Panchayat Gujarat
     url: https://www.panchayat.gujarat.gov.in
-    type: web
-
-  - name: Panchayat Odisha
-    url: https://panchayatiraj.odisha.gov.in
-    type: web
-
-  - name: Panchayat Jharkhand
-    url: https://panchayat.jharkhand.gov.in
-    type: web
-
-  - name: Panchayat Chhattisgarh
-    url: https://panchayat.cg.gov.in
     type: web
 
   # ══════════════════════════════════════
@@ -246,10 +218,6 @@ sources:
     url: https://mahapolice.gov.in/mahapolice/jsp/temp/recruitment.jsp
     type: web
 
-  - name: ZP Maharashtra
-    url: https://zp.maharashtra.gov.in
-    type: web
-
   # Tamil Nadu
   - name: TNPSC
     url: https://www.tnpsc.gov.in/notifications.html
@@ -269,7 +237,7 @@ sources:
     type: web
 
   - name: KSSB
-    url: https://kssb.karnataka.gov.in
+    url: https://kssb.karnataka.gov.in/page/Recruitment/en
     type: web
 
   - name: Karnataka Police
@@ -287,7 +255,7 @@ sources:
 
   # Telangana
   - name: TSPSC
-    url: https://www.tspsc.gov.in/TSPSC/
+    url: https://www.tspsc.gov.in/
     type: web
 
   - name: TS Police
@@ -303,10 +271,6 @@ sources:
     url: https://gsssb.gujarat.gov.in
     type: web
 
-  - name: Gujarat Police
-    url: https://www.gujarat-police.gov.in/recruitment.htm
-    type: web
-
   # Haryana
   - name: HPSC
     url: https://hpsc.gov.in
@@ -314,10 +278,6 @@ sources:
 
   - name: HSSC
     url: https://www.hssc.gov.in
-    type: web
-
-  - name: Haryana Police
-    url: https://haryanapolicerecruitment.gov.in
     type: web
 
   # Punjab
@@ -340,7 +300,7 @@ sources:
 
   # Uttarakhand
   - name: UKPSC
-    url: https://ukpsc.gov.in/pages/advertisements
+    url: https://www.ukpsc.gov.in/pages/advertisements
     type: web
 
   - name: UKSSSC
@@ -384,7 +344,7 @@ sources:
     type: web
 
   - name: SLRC Assam
-    url: https://slrc-assam.org
+    url: https://slrc-assam.in
     type: web
 
   # Kerala
@@ -411,20 +371,8 @@ sources:
     url: https://mpscmanipur.gov.in
     type: web
 
-  - name: MPSC Meghalaya
-    url: https://mpsc.nic.in
-    type: web
-
   - name: NPSC Nagaland
     url: https://npsc.nagaland.gov.in
-    type: web
-
-  - name: SPSC Sikkim
-    url: https://spsc.gov.in
-    type: web
-
-  - name: TPSC Tripura
-    url: https://tpsc.gov.in
     type: web
 
   # ══════════════════════════════════════
@@ -470,7 +418,7 @@ sources:
     type: web
 
   - name: NHM WB
-    url: https://www.wbhealth.gov.in/pages/notification
+    url: https://wbhealth.gov.in/pages/notification
     type: web
 
   - name: NHM MP
@@ -479,10 +427,6 @@ sources:
 
   - name: NHM Rajasthan
     url: https://rajswasthya.nic.in/recruitment.htm
-    type: web
-
-  - name: NHM Maharashtra
-    url: https://nrhm.maharashtra.gov.in/1261/Recruitments
     type: web
 
   # ══════════════════════════════════════
