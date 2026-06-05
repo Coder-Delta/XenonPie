@@ -6,6 +6,7 @@ from .dedup import is_duplicate
 from .ranker import rank_job
 from .search_agent import enrich_job_details
 from alerts.bot_handler import register_job
+from storage.db import save_job
 
 
 async def process_raw_job(

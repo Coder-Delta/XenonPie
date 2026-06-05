@@ -7,7 +7,10 @@ from streams.consumer import consume_raw_jobs, consume_alerts
 from alerts.telegram import get_updates
 from alerts.bot_handler import handle_command
 import yaml
+from utils.logger import setup_logger
 
+
+setup_logger(level="INFO")
 
 def load_sources():
     with open("config/sources.yaml") as f:
