@@ -49,13 +49,23 @@ async def extract_job_details(text: str) -> dict | None:
         )
 
         raw = _clean_json(response.choices[0].message.content.strip())
-        data = json.loads(raw)
-        logger.info(f"Extracted: {data.get('title')} — {data.get('organization')}")
+
+        # handle if model returns a list instead of dict
+        parsed = json.loads(raw)
+        if isinstance(parsed, list):
+            data = parsed[0] if parsed else None
+        else:
+            data = parsed
+
+        logger.info(
+            f"Extracted: {data.get('title')} — {data.get('organization')}"
+        )
         return data
 
     except json.JSONDecodeError as e:
         logger.error(f"JSON parse failed in extractor: {e}")
         return await _fallback_gemini(text)
+
     except Exception as e:
         if _is_rate_limit_error(e):
             logger.warning("Groq rate limit hit, trying Gemini fallback")
@@ -68,19 +78,24 @@ async def extract_job_details(text: str) -> dict | None:
 async def _fallback_gemini(text: str) -> dict | None:
     try:
         prompt = EXTRACT_PROMPT.format(text=text[:6000])
+
         gemini_client = genai.Client(api_key=settings.GEMINI_API_KEY)
+
         response = gemini_client.models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt,
         )
+
         raw = _clean_json(response.text.strip())
         data = json.loads(raw)
+
         logger.info(f"Gemini fallback extracted: {data.get('title')}")
         return data
 
     except json.JSONDecodeError as e:
         logger.error(f"Gemini fallback JSON parse failed: {e}")
         return None
+
     except Exception as e:
         logger.error(f"Gemini fallback error: {e}")
         return None

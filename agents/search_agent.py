@@ -1,10 +1,11 @@
 import json
-import asyncio
+from datetime import date
 from google import genai
 from loguru import logger
 from config.settings import settings
 
 client = genai.Client(api_key=settings.GEMINI_API_KEY)
+_GEMINI_LIMIT = 15
 
 SEARCH_PROMPT = """
 You are a government job information finder for India.
@@ -12,11 +13,12 @@ A job was found with this partial info:
 Title: {title}
 Organization: {organization}
 Category: {category}
+
 Search your knowledge and fill in ALL missing fields. Return ONLY valid JSON:
 {{
   "title": "{title}",
   "organization": "{organization}",
-  "vacancies": <number or null>,
+  "vacancies": null,
   "eligibility": "<age/education requirements>",
   "last_date": "<ISO date or null>",
   "apply_link": "<official URL or null>",
@@ -26,14 +28,48 @@ Search your knowledge and fill in ALL missing fields. Return ONLY valid JSON:
   "selection_process": "<written/interview/physical>",
   "official_website": "<URL>"
 }}
+
 Return ONLY JSON, no explanation.
 """
 
+
+async def _get_call_count() -> int:
+    try:
+        import redis.asyncio as aioredis
+        r = await aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+        today = date.today().isoformat()
+        val = await r.get(f"gemini:calls:{today}")
+        await r.aclose()
+        return int(val) if val else 0
+    except Exception:
+        return 0
+
+
+async def _increment_call_count() -> int:
+    try:
+        import redis.asyncio as aioredis
+        r = await aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+        today = date.today().isoformat()
+        key = f"gemini:calls:{today}"
+        count = await r.incr(key)
+        await r.expire(key, 86400)
+        await r.aclose()
+        return count
+    except Exception:
+        return 0
+
+
 async def enrich_job_details(job: dict) -> dict:
+    count = await _get_call_count()
+    if count >= _GEMINI_LIMIT:
+        logger.debug(f"Gemini daily limit ({_GEMINI_LIMIT}) reached, skipping: {job.get('title')}")
+        return job
+
     title = job.get("title") or ""
     org = job.get("organization") or ""
     category = job.get("category_tag") or ""
 
+    # check what's missing
     missing = []
     if not job.get("vacancies"):
         missing.append("vacancies")
@@ -49,16 +85,22 @@ async def enrich_job_details(job: dict) -> dict:
         return job
 
     logger.info(f"Enriching {title} — missing: {missing}")
+
     try:
         prompt = SEARCH_PROMPT.format(
             title=title,
             organization=org,
-            category=category
+            category=category,
         )
+
+        count = await _increment_call_count()
+        logger.debug(f"Gemini call {count}/{_GEMINI_LIMIT}")
+
         response = client.models.generate_content(
             model="gemini-2.5-flash",
-            contents=prompt
+            contents=prompt,
         )
+
         raw = response.text.strip().replace("```json", "").replace("```", "").strip()
         enriched = json.loads(raw)
 
@@ -77,7 +119,7 @@ async def enrich_job_details(job: dict) -> dict:
         return job
 
     except json.JSONDecodeError:
-        logger.warning(f"Gemini enrichment JSON parse failed for {title}")
+        logger.warning(f"Gemini JSON parse failed for {title}")
         return job
     except Exception as e:
         logger.error(f"Search agent failed for {title}: {e}")
