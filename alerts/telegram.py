@@ -79,6 +79,10 @@ async def delete_webhook():
 
 async def get_updates(offset: int = 0) -> list[dict]:
     token = settings.TELEGRAM_BOT_TOKEN
+    if not token:
+        logger.warning("TELEGRAM_BOT_TOKEN not set, skipping getUpdates")
+        return []
+
     url = TELEGRAM_API.format(token=token, method="getUpdates")
     try:
         async with httpx.AsyncClient(timeout=35) as client:

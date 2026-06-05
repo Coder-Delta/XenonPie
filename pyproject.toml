@@ -1,7 +1,27 @@
 [project]
 name = "xenonpie"
 version = "0.1.0"
-description = "Add your description here"
+description = "Async job source scraper and alert pipeline for Indian job notices"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "beautifulsoup4>=4.14.3",
+    "feedparser>=6.0.12",
+    "google-genai>=2.8.0",
+    "groq>=1.4.0",
+    "httpx>=0.28.1",
+    "loguru>=0.7.3",
+    "pdf2image>=1.17.0",
+    "pydantic-settings>=2.14.1",
+    "pytesseract>=0.3.13",
+    "pyyaml>=6.0.3",
+    "redis>=8.0.0",
+    "resend>=2.30.1",
+    "twilio>=9.10.9",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-asyncio>=1.4.0",
+]

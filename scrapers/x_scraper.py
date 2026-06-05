@@ -27,6 +27,10 @@ async def scrape_x_user(
     ]
     """
 
+    if not settings.X_BEARER_TOKEN:
+        logger.warning("X_BEARER_TOKEN not set, skipping X user scrape")
+        return []
+
     headers = {
         "Authorization": f"Bearer {settings.X_BEARER_TOKEN}",
     }
@@ -103,6 +107,10 @@ async def scrape_x_post(
     """
     Fetch a single tweet.
     """
+
+    if not settings.X_BEARER_TOKEN:
+        logger.warning("X_BEARER_TOKEN not set, skipping X post scrape")
+        return None
 
     headers = {
         "Authorization": f"Bearer {settings.X_BEARER_TOKEN}",

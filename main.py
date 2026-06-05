@@ -1,6 +1,7 @@
 import asyncio
 from loguru import logger
 from scrapers import scrape_url, parse_feed, has_changed
+from scrapers.x_scraper import scrape_x_user, extract_hiring_posts
 from streams.producer import push_raw_job
 from streams.consumer import consume_raw_jobs, consume_alerts
 from alerts.telegram import get_updates
@@ -42,8 +43,17 @@ async def scraper_loop():
                     for entry in entries:
                         if has_changed(entry["link"], entry["summary"]):
                             await push_raw_job(entry)
+                elif source["type"] == "x":
+                    posts = await scrape_x_user(source["username"])
+                    for post in extract_hiring_posts(posts):
+                        if has_changed(post["url"], post["text"]):
+                            post["source"] = source["name"]
+                            post["source_type"] = "x"
+                            await push_raw_job(post)
+                else:
+                    logger.warning(f"Unknown source type: {source}")
             except Exception as e:
-                logger.error(f"Scraper error for {source['url']}: {e}")
+                logger.error(f"Scraper error for {source.get('url') or source.get('username')}: {e}")
 
         logger.info("Cycle done. Sleeping 30 min...")
         await asyncio.sleep(30 * 60)

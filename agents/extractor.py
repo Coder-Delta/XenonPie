@@ -1,6 +1,7 @@
 import json
 from loguru import logger
 from groq import Groq
+from google import genai
 from config.settings import settings
 
 client = Groq(api_key=settings.GROQ_API_KEY)
@@ -27,6 +28,15 @@ Return ONLY JSON, no explanation.
 """
 
 
+def _clean_json(raw: str) -> str:
+    return raw.replace("```json", "").replace("```", "").strip()
+
+
+def _is_rate_limit_error(error: Exception) -> bool:
+    error_text = str(error).lower()
+    return "rate_limit" in error_text or "429" in error_text
+
+
 async def extract_job_details(text: str) -> dict | None:
     try:
         prompt = EXTRACT_PROMPT.format(text=text[:4000])
@@ -38,8 +48,7 @@ async def extract_job_details(text: str) -> dict | None:
             max_tokens=1000,
         )
 
-        raw = response.choices[0].message.content.strip()
-        raw = raw.replace("```json", "").replace("```", "").strip()
+        raw = _clean_json(response.choices[0].message.content.strip())
         data = json.loads(raw)
         logger.info(f"Extracted: {data.get('title')} — {data.get('organization')}")
         return data
@@ -48,40 +57,30 @@ async def extract_job_details(text: str) -> dict | None:
         logger.error(f"JSON parse failed in extractor: {e}")
         return await _fallback_gemini(text)
     except Exception as e:
+        if _is_rate_limit_error(e):
+            logger.warning("Groq rate limit hit, trying Gemini fallback")
+            return await _fallback_gemini(text)
+
         logger.error(f"Extractor error: {e}")
         return None
 
 
 async def _fallback_gemini(text: str) -> dict | None:
     try:
-        import google.generativeai as genai
-        import asyncio
-
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        model = genai.GenerativeModel("gemini-1.5-flash")
-
         prompt = EXTRACT_PROMPT.format(text=text[:6000])
-        response = model.generate_content(prompt)
-        raw = response.text.strip().replace("```json", "").replace("```", "").strip()
+        gemini_client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        response = gemini_client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+        )
+        raw = _clean_json(response.text.strip())
         data = json.loads(raw)
         logger.info(f"Gemini fallback extracted: {data.get('title')}")
         return data
 
+    except json.JSONDecodeError as e:
+        logger.error(f"Gemini fallback JSON parse failed: {e}")
+        return None
     except Exception as e:
-        error_str = str(e)
-
-        if "rate_limit_exceeded" in error_str or "429" in error_str:
-            import re
-
-            match = re.search(r"try again in (\d+)m", error_str)
-            wait = int(match.group(1)) * 60 + 10 if match else 60
-
-            logger.warning(
-                f"Groq rate limit hit, waiting {wait}s then trying Gemini..."
-            )
-
-            await asyncio.sleep(2)  # don't wait, just fallback immediately
-            return await _fallback_gemini(text)
-
-        logger.error(f"Extractor error: {e}")
+        logger.error(f"Gemini fallback error: {e}")
         return None

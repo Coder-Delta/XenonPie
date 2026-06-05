@@ -1,7 +1,9 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env")
+
     GROQ_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
 
@@ -19,9 +21,6 @@ class Settings(BaseSettings):
     RESEND_API_KEY: str = ""
 
     X_BEARER_TOKEN: str = ""
-
-    class Config:
-        env_file = ".env"
 
 
 settings = Settings()
