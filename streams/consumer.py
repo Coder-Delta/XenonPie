@@ -20,10 +20,12 @@ async def get_redis():
         redis_client = await aioredis.from_url(
             settings.REDIS_URL,
             encoding="utf-8",
-            decode_responses=True
+            decode_responses=True,
+            socket_timeout=30,
+            socket_connect_timeout=10,
+            retry_on_timeout=True,
         )
     return redis_client
-
 
 async def _ensure_groups():
     r = await get_redis()

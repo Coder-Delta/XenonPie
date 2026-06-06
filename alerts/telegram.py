@@ -7,11 +7,40 @@ TELEGRAM_API = "https://api.telegram.org/bot{token}/{method}"
 
 # ── low-level send ─────────────────────────────────────────────────────────────
 
-async def send_telegram_alert(
-    message: str,
-    user_id: str | None = None,
-    chat_id: str | None = None,
-):
+async def send_telegram_alert(message: str, user_id: str | None = None, chat_id: str | None = None):
+    token = settings.TELEGRAM_BOT_TOKEN
+    if not token:
+        return False
+
+    target = chat_id or user_id
+    if not target:
+        return False
+
+    # split long messages into chunks of 4000 chars
+    chunks = [message[i:i+4000] for i in range(0, len(message), 4000)]
+
+    url = TELEGRAM_API.format(token=token, method="sendMessage")
+
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            for chunk in chunks:
+                payload = {
+                    "chat_id": target,
+                    "text": chunk,
+                    "parse_mode": "HTML",
+                    "disable_web_page_preview": False,
+                }
+                response = await client.post(url, json=payload)
+                response.raise_for_status()
+            logger.info(f"Telegram alert sent to {target}")
+            return True
+
+    except httpx.HTTPStatusError as e:
+        logger.error(f"Telegram HTTP error: {e.response.text}")
+    except Exception as e:
+        logger.error(f"Telegram send failed: {e}")
+    return False
+    
     token = settings.TELEGRAM_BOT_TOKEN
     if not token:
         logger.warning("TELEGRAM_BOT_TOKEN not set, skipping")
