@@ -78,6 +78,45 @@ async def init_db():
                 sent_at TIMESTAMPTZ DEFAULT NOW(),
                 UNIQUE(chat_id, job_fingerprint)
             );
+
+            CREATE TABLE IF NOT EXISTS plans (
+                id SERIAL PRIMARY KEY,
+                name TEXT UNIQUE NOT NULL,
+                price_inr INTEGER DEFAULT 0,
+                alerts_per_day INTEGER DEFAULT 5,
+                categories_limit INTEGER DEFAULT 2,
+                states_limit INTEGER DEFAULT 2,
+                features TEXT[] DEFAULT '{}',
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            );
+
+            CREATE TABLE IF NOT EXISTS subscriptions (
+                id SERIAL PRIMARY KEY,
+                chat_id TEXT NOT NULL REFERENCES users(chat_id),
+                plan_name TEXT NOT NULL DEFAULT 'free',
+                status TEXT DEFAULT 'active',
+                started_at TIMESTAMPTZ DEFAULT NOW(),
+                expires_at TIMESTAMPTZ,
+                payment_id TEXT,
+                amount_paid INTEGER DEFAULT 0,
+                UNIQUE(chat_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS alert_usage (
+                id SERIAL PRIMARY KEY,
+                chat_id TEXT NOT NULL,
+                date DATE DEFAULT CURRENT_DATE,
+                count INTEGER DEFAULT 0,
+                UNIQUE(chat_id, date)
+            );
+
+            INSERT INTO plans (name, price_inr, alerts_per_day, categories_limit, states_limit, features)
+            VALUES
+                ('free',    0,    5,  2, 2, ARRAY['basic_alerts', 'state_filter']),
+                ('basic',   99,   20, 5, 5, ARRAY['basic_alerts', 'state_filter', 'category_filter', 'daily_digest']),
+                ('pro',     299,  100, 20, 20, ARRAY['all_alerts', 'state_filter', 'category_filter', 'daily_digest', 'priority_alerts', 'exam_reminders']),
+                ('premium', 599,  999, 99, 99, ARRAY['unlimited', 'all_features', 'early_alerts', 'pdf_reports'])
+            ON CONFLICT (name) DO NOTHING;
         """)
         logger.info("Database tables initialized")
 

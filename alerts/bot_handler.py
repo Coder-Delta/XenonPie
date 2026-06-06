@@ -131,6 +131,11 @@ HELP_TEXT = """
 /subscribe — Auto-alerts ON
 /unsubscribe — Auto-alerts OFF
 /status — Bot status
+
+<b>💳 Billing</b>
+/plan — Your current plan
+/upgrade — See all plans
+/pay — Pay & upgrade
 """
 
 WELCOME_TEXT = """
@@ -178,6 +183,128 @@ async def handle_command(chat_id: str, text: str):
             f"🔔 Your status: {subscribed}"
         )
         await send_telegram_alert(msg, chat_id=chat_id)
+
+    elif cmd == "plan":
+        from storage.billing import get_user_plan, get_alert_count_today
+        plan = await get_user_plan(chat_id)
+        count = await get_alert_count_today(chat_id)
+        limit = plan["alerts_per_day"]
+        msg = (
+            f"{plan['emoji']} <b>Your Plan: {plan['label']}</b>\n\n"
+            f"📨 Alerts today: {count}/{limit}\n"
+            f"📂 Category slots: {plan['categories_limit']}\n"
+            f"🗺 State slots: {plan['states_limit']}\n\n"
+            f"Use /upgrade to see all plans."
+        )
+        await send_telegram_alert(msg, chat_id=chat_id)
+
+    elif cmd == "upgrade":
+        msg = """
+💎 <b>XenonPie Plans</b>
+
+🆓 <b>Free</b> — ₹0/month
+• 5 alerts/day
+• 2 categories
+• 2 states
+
+⭐ <b>Basic</b> — ₹99/month
+• 20 alerts/day
+• 5 categories
+• 5 states
+• Daily digest
+
+🚀 <b>Pro</b> — ₹299/month
+• 100 alerts/day
+• 20 categories
+• 20 states
+• Priority alerts
+• Exam reminders
+
+💎 <b>Premium</b> — ₹599/month
+• Unlimited alerts
+• All categories
+• All states
+• Early alerts
+• PDF reports
+
+To upgrade, pay via UPI and send:
+`/pay basic <UTR>`
+`/pay pro <UTR>`
+`/pay premium <UTR>`
+
+UPI ID: `xenonpie@upi`
+"""
+        await send_telegram_alert(msg, chat_id=chat_id)
+
+    elif cmd == "pay":
+        if len(args) < 2:
+            await send_telegram_alert(
+                "Usage: /pay <plan> <UTR>\n\nExample:\n/pay pro 123456789012",
+                chat_id=chat_id
+            )
+            return
+        plan_name = args[0].lower()
+        utr = args[1]
+        from storage.billing import PLANS
+        if plan_name not in PLANS or plan_name == "free":
+            await send_telegram_alert(
+                "Invalid plan. Choose: basic, pro, premium",
+                chat_id=chat_id
+            )
+            return
+        ADMIN_ID = "8939136566"
+        await send_telegram_alert(
+            f"🔔 <b>Payment Request</b>\n\n"
+            f"User: {chat_id}\n"
+            f"Plan: {plan_name}\n"
+            f"UTR: {utr}\n\n"
+            f"To approve: /approve {chat_id} {plan_name}",
+            chat_id=ADMIN_ID
+        )
+        await send_telegram_alert(
+            f"✅ Payment request received!\n\n"
+            f"Plan: <b>{plan_name}</b>\n"
+            f"UTR: <b>{utr}</b>\n\n"
+            f"We\'ll activate your plan within 1 hour after verification.",
+            chat_id=chat_id
+        )
+
+    elif cmd == "approve":
+        ADMIN_ID = "8939136566"
+        if chat_id != ADMIN_ID:
+            await send_telegram_alert("❌ Unauthorized.", chat_id=chat_id)
+            return
+        if len(args) < 2:
+            await send_telegram_alert(
+                "Usage: /approve <user_chat_id> <plan>",
+                chat_id=chat_id
+            )
+            return
+        target_id = args[0]
+        plan_name = args[1].lower()
+        from storage.billing import activate_plan, PLANS
+        if plan_name not in PLANS or plan_name == "free":
+            await send_telegram_alert(
+                "Invalid plan. Choose: basic, pro, premium",
+                chat_id=chat_id
+            )
+            return
+        success = await activate_plan(target_id, plan_name)
+        if success:
+            plan = PLANS[plan_name]
+            await send_telegram_alert(
+                f"✅ Plan activated!\n\n"
+                f"Plan: {plan['emoji']} <b>{plan['label']}</b>\n"
+                f"Alerts/day: {plan['alerts_per_day']}\n"
+                f"Valid for 30 days.",
+                chat_id=target_id
+            )
+            await send_telegram_alert(
+                f"✅ Approved {target_id} → {plan_name}",
+                chat_id=ADMIN_ID
+            )
+        else:
+            await send_telegram_alert(f"❌ Failed to activate {plan_name} for {target_id}", chat_id=ADMIN_ID)
 
     elif cmd == "subscribe":
         try:

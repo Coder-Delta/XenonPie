@@ -124,6 +124,7 @@ async def consume_raw_jobs_once(user_profiles: list[dict], batch: int = 10):
 async def consume_alerts():
     from alerts.formatter import format_alert
     from alerts.telegram import send_telegram_alert
+    from storage.billing import can_receive_alert, increment_alert_count
 
     r = await get_redis()
     await _ensure_groups()
@@ -147,11 +148,28 @@ async def consume_alerts():
                 for msg_id, fields in entries:
                     try:
                         job = json.loads(fields["data"])
+                        chat_id = job.get("user_id")
+
+                        if not chat_id:
+                            await r.xack(STREAM_ALERTS, GROUP_ALERTS, msg_id)
+                            continue
+
+                        allowed, reason = await can_receive_alert(chat_id)
+                        if not allowed:
+                            logger.info(f"Alert blocked for {chat_id} — limit reached")
+                            await send_telegram_alert(message=reason, chat_id=chat_id)
+                            await r.xack(STREAM_ALERTS, GROUP_ALERTS, msg_id)
+                            continue
+
                         message = format_alert(job)
-                        await send_telegram_alert(
+                        sent = await send_telegram_alert(
                             message=message,
-                            user_id=job.get("user_id")
+                            chat_id=chat_id
                         )
+
+                        if sent:
+                            await increment_alert_count(chat_id)
+
                         await r.xack(STREAM_ALERTS, GROUP_ALERTS, msg_id)
                         logger.debug(f"Alert sent + ACK {msg_id}")
 
