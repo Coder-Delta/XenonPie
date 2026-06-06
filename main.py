@@ -5,7 +5,7 @@ from utils.logger import setup_logger
 from streams.consumer import consume_raw_jobs, consume_alerts
 from alerts.telegram import get_updates
 from alerts.bot_handler import handle_command
-from storage.db import init_db
+from storage.db import init_db, get_pool
 from scheduler import setup_scheduler, scrape_all
 
 setup_logger(level="INFO")
@@ -17,17 +17,39 @@ def load_sources():
     return data["sources"]
 
 
-USER_PROFILES = [
-    {
-        "user_id": "8939136566",
-        "categories": ["central_govt", "bank", "railway"],
-        "education_level": "graduate",
-        "states": ["all_india", "west_bengal"],
-    },
-]
+async def load_user_profiles() -> list[dict]:
+    try:
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT chat_id, categories, states, education_level FROM users WHERE subscribed = TRUE"
+            )
+            profiles = []
+            for row in rows:
+                profiles.append({
+                    "user_id": row["chat_id"],
+                    "categories": list(row["categories"] or []),
+                    "states": list(row["states"] or ["all_india"]),
+                    "education_level": row["education_level"] or "graduate",
+                })
+            if not profiles:
+                profiles = [{
+                    "user_id": "8939136566",
+                    "categories": ["central_govt", "bank", "railway"],
+                    "education_level": "graduate",
+                    "states": ["all_india", "west_bengal"],
+                }]
+            logger.info(f"Loaded {len(profiles)} user profiles from DB")
+            return profiles
+    except Exception as e:
+        logger.error(f"load_user_profiles error: {e}")
+        return [{
+            "user_id": "8939136566",
+            "categories": ["central_govt", "bank", "railway"],
+            "education_level": "graduate",
+            "states": ["all_india", "west_bengal"],
+        }]
 
-
-# ── telegram bot polling ───────────────────────────────────────────────────────
 
 async def bot_polling_loop():
     logger.info("Telegram bot polling started")
@@ -50,28 +72,24 @@ async def bot_polling_loop():
             await asyncio.sleep(5)
 
 
-# ── main ───────────────────────────────────────────────────────────────────────
-
 async def main():
     logger.info("XenonPie starting...")
 
-    # init DB tables
     try:
         await init_db()
     except Exception as e:
-        logger.warning(f"DB init skipped (no postgres): {e}")
+        logger.warning(f"DB init skipped: {e}")
 
-    # setup + start scheduler
     sched = setup_scheduler()
     sched.start()
     logger.info("Scheduler started")
 
-    # run first scrape immediately
+    user_profiles = await load_user_profiles()
+
     asyncio.create_task(scrape_all())
 
-    # run all loops concurrently
     await asyncio.gather(
-        consume_raw_jobs(USER_PROFILES),
+        consume_raw_jobs(user_profiles),
         consume_alerts(),
         bot_polling_loop(),
     )

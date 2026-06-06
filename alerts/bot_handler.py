@@ -1,60 +1,20 @@
 """
 Bot command handler for XenonPie Telegram bot.
-
-Commands:
-  /start            — welcome + help
-  /help             — list all commands
-  /govtjobs         — latest central govt jobs
-  /statejobs        — latest state govt jobs
-  /privatejobs      — latest private/corporate jobs
-  /internships      — latest internships
-  /indiajobs        — all India (any category)
-  /wbjobs           — West Bengal jobs
-  /upjobs           — Uttar Pradesh jobs
-  /bihajobs         — Bihar jobs
-  /rajjobs          — Rajasthan jobs
-  /mhjobs           — Maharashtra jobs
-  /tnajobs          — Tamil Nadu jobs
-  /karnajobs        — Karnataka jobs
-  /keralajobs       — Kerala jobs
-  /mpjobs           — Madhya Pradesh jobs
-  /gjjobs           — Gujarat jobs
-  /pbjobs           — Punjab jobs
-  /hyjobs           — Haryana jobs
-  /ukjobs           — Uttarakhand jobs
-  /jkjobs           — Jammu & Kashmir jobs
-  /railway          — Railway jobs
-  /bank             — Banking jobs
-  /defence          — Defence / Army / Navy jobs
-  /teaching         — Teaching jobs
-  /police           — Police jobs
-  /aiJobs           — AI / ML engineer jobs
-  /devops           — DevOps jobs
-  /backend          — Backend engineer jobs
-  /fullstack        — Fullstack engineer jobs
-  /dataentry        — Data entry jobs
-  /remote           — Remote jobs
-  /subscribe        — Subscribe to auto-alerts
-  /unsubscribe      — Unsubscribe from alerts
-  /status           — Bot status
 """
 
 from datetime import date
 from loguru import logger
 from alerts.telegram import send_telegram_alert
 from alerts.formatter import format_alert
+from storage.db import save_user, get_user, update_user_prefs
 
-# ── in-memory job store (filled by supervisor as jobs come in) ─────────────────
-# Structure: list of job dicts, capped at 500 most recent
+# ── in-memory job store ────────────────────────────────────────────────────────
 _recent_jobs: list[dict] = []
 MAX_JOBS = 500
-
-# ── subscriber store (in-memory; swap for Redis/DB later) ─────────────────────
 _subscribers: set[str] = set()
 
 
 def register_job(job: dict):
-    """Called by supervisor for every processed job — keeps rolling window."""
     global _recent_jobs
     _recent_jobs.append(job)
     if len(_recent_jobs) > MAX_JOBS:
@@ -76,8 +36,7 @@ def _filter(
     results = []
     today = date.today()
 
-    for job in reversed(_recent_jobs):  # newest first
-        # skip expired
+    for job in reversed(_recent_jobs):
         ld = job.get("last_date")
         if ld and ld != "N/A":
             try:
@@ -122,14 +81,14 @@ def _format_jobs(jobs: list[dict], header: str) -> str:
     return "\n".join(parts)
 
 
-# ── command router ─────────────────────────────────────────────────────────────
+# ── texts ──────────────────────────────────────────────────────────────────────
 
 HELP_TEXT = """
 🤖 <b>XenonPie Job Bot</b>
 
 <b>🏛 Govt Jobs</b>
 /govtjobs — Central Govt
-/statejobs — State Govt (all)
+/statejobs — State Govt
 /railway — Railway
 /bank — Banking
 /defence — Defence
@@ -154,16 +113,21 @@ HELP_TEXT = """
 /indiajobs — All India
 
 <b>💼 Private / Tech</b>
-/privatejobs — All corporate
-/aiJobs — AI / ML
+/privatejobs — Corporate
+/aijobs — AI / ML
 /devops — DevOps
 /backend — Backend
 /fullstack — Fullstack
 /dataentry — Data Entry
-/remote — Remote jobs
+/remote — Remote
 /internships — Internships
 
-<b>⚙️ Settings</b>
+<b>👤 Your Profile</b>
+/myprofile — View settings
+/setstate <state> — Add state filter
+/setcategory <cat> — Add category
+/seteducation <level> — Set education
+/resetprofile — Reset defaults
 /subscribe — Auto-alerts ON
 /unsubscribe — Auto-alerts OFF
 /status — Bot status
@@ -172,19 +136,32 @@ HELP_TEXT = """
 WELCOME_TEXT = """
 👋 <b>Welcome to XenonPie!</b>
 
-I send you fresh job alerts from 100+ Indian govt portals and tech job boards.
+I send fresh job alerts from 100+ Indian govt portals.
+
+<b>Get started:</b>
+1️⃣ /setstate west_bengal
+2️⃣ /setcategory bank
+3️⃣ /seteducation graduate
+4️⃣ /subscribe
 
 Type /help to see all commands.
 """
 
 
+# ── command router ─────────────────────────────────────────────────────────────
+
 async def handle_command(chat_id: str, text: str):
-    """Route a Telegram command to the right handler."""
     cmd = text.strip().split()[0].lower().lstrip("/").split("@")[0]
+    args = text.strip().split()[1:]
     logger.info(f"Bot command /{cmd} from {chat_id}")
 
     # ── meta ──────────────────────────────────────────────────────────────────
     if cmd == "start":
+        try:
+            await save_user(chat_id=chat_id, name="user")
+            _subscribers.add(chat_id)
+        except Exception as e:
+            logger.error(f"Save user error: {e}")
         await send_telegram_alert(WELCOME_TEXT, chat_id=chat_id)
 
     elif cmd in ("help", "commands"):
@@ -204,19 +181,174 @@ async def handle_command(chat_id: str, text: str):
 
     elif cmd == "subscribe":
         _subscribers.add(chat_id)
+        try:
+            user = await get_user(chat_id) or {}
+            await update_user_prefs(chat_id, {
+                "categories": user.get("categories") or [],
+                "states": user.get("states") or ["all_india"],
+                "education_level": user.get("education_level") or "graduate",
+                "subscribed": True,
+            })
+        except Exception as e:
+            logger.error(f"Subscribe DB error: {e}")
         await send_telegram_alert(
-            "✅ <b>Subscribed!</b> You'll get auto-alerts for new jobs matching your profile.",
+            "✅ <b>Subscribed!</b> You'll get auto-alerts for new matching jobs.",
             chat_id=chat_id,
         )
 
     elif cmd == "unsubscribe":
         _subscribers.discard(chat_id)
+        try:
+            user = await get_user(chat_id) or {}
+            await update_user_prefs(chat_id, {
+                "categories": user.get("categories") or [],
+                "states": user.get("states") or ["all_india"],
+                "education_level": user.get("education_level") or "graduate",
+                "subscribed": False,
+            })
+        except Exception as e:
+            logger.error(f"Unsubscribe DB error: {e}")
         await send_telegram_alert(
-            "🔕 <b>Unsubscribed.</b> You won't get auto-alerts. Use /subscribe to re-enable.",
+            "🔕 <b>Unsubscribed.</b> Use /subscribe to re-enable.",
             chat_id=chat_id,
         )
 
-    # ── central govt ──────────────────────────────────────────────────────────
+    # ── profile management ─────────────────────────────────────────────────────
+    elif cmd == "myprofile":
+        try:
+            user = await get_user(chat_id)
+            if not user:
+                await send_telegram_alert(
+                    "No profile found. Send /start first.",
+                    chat_id=chat_id
+                )
+                return
+            cats = ", ".join(user.get("categories") or []) or "all"
+            states = ", ".join(user.get("states") or ["all_india"])
+            edu = user.get("education_level") or "graduate"
+            sub = "✅ ON" if user.get("subscribed") else "❌ OFF"
+            msg = (
+                f"👤 <b>Your Profile</b>\n\n"
+                f"📂 Categories: <b>{cats}</b>\n"
+                f"🗺 States: <b>{states}</b>\n"
+                f"🎓 Education: <b>{edu}</b>\n"
+                f"🔔 Auto-alerts: {sub}\n\n"
+                f"Use /setcategory, /setstate, /seteducation to update."
+            )
+            await send_telegram_alert(msg, chat_id=chat_id)
+        except Exception as e:
+            logger.error(f"myprofile error: {e}")
+            await send_telegram_alert("Error loading profile.", chat_id=chat_id)
+
+    elif cmd == "setstate":
+        if not args:
+            await send_telegram_alert(
+                "Usage: /setstate <state>\n\nExamples:\n"
+                "/setstate west_bengal\n"
+                "/setstate uttar_pradesh\n"
+                "/setstate all_india",
+                chat_id=chat_id
+            )
+            return
+        state = "_".join(args).lower().replace(" ", "_")
+        try:
+            user = await get_user(chat_id) or {}
+            states = list(user.get("states") or ["all_india"])
+            if state not in states:
+                states.append(state)
+            await update_user_prefs(chat_id, {
+                "states": states,
+                "categories": user.get("categories") or [],
+                "education_level": user.get("education_level") or "graduate",
+                "subscribed": user.get("subscribed", True),
+            })
+            await send_telegram_alert(
+                f"✅ State added: <b>{state}</b>\n\nYour states: {', '.join(states)}\n\nUse /myprofile to see all settings.",
+                chat_id=chat_id
+            )
+        except Exception as e:
+            logger.error(f"setstate error: {e}")
+            await send_telegram_alert("Error updating state.", chat_id=chat_id)
+
+    elif cmd == "setcategory":
+        if not args:
+            await send_telegram_alert(
+                "Usage: /setcategory <category>\n\nOptions:\n"
+                "central_govt, state_govt, bank, railway\n"
+                "defence, psu, police, teaching, other",
+                chat_id=chat_id
+            )
+            return
+        cat = args[0].lower()
+        try:
+            user = await get_user(chat_id) or {}
+            cats = list(user.get("categories") or [])
+            if cat not in cats:
+                cats.append(cat)
+            await update_user_prefs(chat_id, {
+                "categories": cats,
+                "states": user.get("states") or ["all_india"],
+                "education_level": user.get("education_level") or "graduate",
+                "subscribed": user.get("subscribed", True),
+            })
+            await send_telegram_alert(
+                f"✅ Category added: <b>{cat}</b>\n\nYour categories: {', '.join(cats)}\n\nUse /myprofile to see all settings.",
+                chat_id=chat_id
+            )
+        except Exception as e:
+            logger.error(f"setcategory error: {e}")
+            await send_telegram_alert("Error updating category.", chat_id=chat_id)
+
+    elif cmd == "seteducation":
+        if not args:
+            await send_telegram_alert(
+                "Usage: /seteducation <level>\n\nOptions:\n"
+                "10th, 12th, diploma, graduate, postgraduate, phd",
+                chat_id=chat_id
+            )
+            return
+        edu = args[0].lower()
+        valid = ["10th", "12th", "diploma", "graduate", "postgraduate", "phd"]
+        if edu not in valid:
+            await send_telegram_alert(
+                f"Invalid level. Choose from: {', '.join(valid)}",
+                chat_id=chat_id
+            )
+            return
+        try:
+            user = await get_user(chat_id) or {}
+            await update_user_prefs(chat_id, {
+                "categories": user.get("categories") or [],
+                "states": user.get("states") or ["all_india"],
+                "education_level": edu,
+                "subscribed": user.get("subscribed", True),
+            })
+            await send_telegram_alert(
+                f"✅ Education level set to: <b>{edu}</b>",
+                chat_id=chat_id
+            )
+        except Exception as e:
+            logger.error(f"seteducation error: {e}")
+            await send_telegram_alert("Error updating education.", chat_id=chat_id)
+
+    elif cmd == "resetprofile":
+        try:
+            await update_user_prefs(chat_id, {
+                "categories": [],
+                "states": ["all_india"],
+                "education_level": "graduate",
+                "subscribed": True,
+            })
+            _subscribers.add(chat_id)
+            await send_telegram_alert(
+                "✅ Profile reset to defaults.\n\nYou'll receive all India jobs at graduate level.",
+                chat_id=chat_id
+            )
+        except Exception as e:
+            logger.error(f"resetprofile error: {e}")
+            await send_telegram_alert("Error resetting profile.", chat_id=chat_id)
+
+    # ── govt jobs ──────────────────────────────────────────────────────────────
     elif cmd == "govtjobs":
         jobs = _filter(category_tags=["central_govt"])
         await send_telegram_alert(
@@ -259,7 +391,7 @@ async def handle_command(chat_id: str, text: str):
             _format_jobs(jobs, "👮 <b>Police Jobs</b>"), chat_id=chat_id
         )
 
-    # ── state-wise ────────────────────────────────────────────────────────────
+    # ── state-wise ─────────────────────────────────────────────────────────────
     elif cmd == "indiajobs":
         jobs = _filter(states=["all_india"])
         await send_telegram_alert(
@@ -350,7 +482,7 @@ async def handle_command(chat_id: str, text: str):
             _format_jobs(jobs, "🗺 <b>J&K Jobs</b>"), chat_id=chat_id
         )
 
-    # ── private / tech ────────────────────────────────────────────────────────
+    # ── private / tech ─────────────────────────────────────────────────────────
     elif cmd == "privatejobs":
         jobs = _filter(category_tags=["private", "tech", "corporate", "startup"])
         await send_telegram_alert(
@@ -388,7 +520,7 @@ async def handle_command(chat_id: str, text: str):
         )
 
     elif cmd == "remote":
-        jobs = _filter(source_types=["remotive", "weworkremotely", "himalayas", "remoteok"])
+        jobs = _filter(source_types=["remotive", "weworkremotely", "himalayas"])
         await send_telegram_alert(
             _format_jobs(jobs, "🌐 <b>Remote Jobs</b>"), chat_id=chat_id
         )
