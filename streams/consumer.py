@@ -83,6 +83,44 @@ async def consume_raw_jobs(user_profiles: list[dict], batch: int = 10):
             await asyncio.sleep(3)
 
 
+async def consume_raw_jobs_once(user_profiles: list[dict], batch: int = 10):
+    r = await get_redis()
+    await _ensure_groups()
+
+    try:
+        messages = await r.xreadgroup(
+            groupname=GROUP_AGENTS,
+            consumername=CONSUMER_NAME,
+            streams={STREAM_RAW: ">"},
+            count=batch,
+            block=2000,
+        )
+
+        if not messages:
+            return
+
+        for stream_name, entries in messages:
+            for msg_id, fields in entries:
+                try:
+                    raw = json.loads(fields["data"])
+                    results = await process_raw_job(raw, user_profiles)
+
+                    from streams.producer import push_alert
+                    for job in results:
+                        await push_alert(job)
+
+                    await r.xack(STREAM_RAW, GROUP_AGENTS, msg_id)
+
+                except Exception as e:
+                    logger.error(f"Failed processing msg {msg_id}: {e}")
+
+    except asyncio.CancelledError:
+        raise
+    except Exception as e:
+        logger.error(f"consume_raw_jobs_once error: {e}")
+        await asyncio.sleep(3)
+
+
 async def consume_alerts():
     from alerts.formatter import format_alert
     from alerts.telegram import send_telegram_alert

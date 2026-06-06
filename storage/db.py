@@ -64,7 +64,7 @@ async def init_db():
                 id SERIAL PRIMARY KEY,
                 chat_id TEXT UNIQUE NOT NULL,
                 name TEXT,
-                subscribed BOOLEAN DEFAULT TRUE,
+                subscribed BOOLEAN DEFAULT FALSE,
                 categories TEXT[],
                 states TEXT[],
                 education_level TEXT DEFAULT 'graduate',
@@ -143,8 +143,8 @@ async def save_user(chat_id: str, name: str = None) -> bool:
     try:
         async with pool.acquire() as conn:
             await conn.execute("""
-                INSERT INTO users (chat_id, name)
-                VALUES ($1, $2)
+                INSERT INTO users (chat_id, name, subscribed)
+                VALUES ($1, $2, FALSE)
                 ON CONFLICT (chat_id) DO UPDATE SET
                     name = EXCLUDED.name
             """, chat_id, name)

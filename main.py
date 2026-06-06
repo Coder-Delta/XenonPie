@@ -2,7 +2,7 @@ import asyncio
 import yaml
 from loguru import logger
 from utils.logger import setup_logger
-from streams.consumer import consume_raw_jobs, consume_alerts
+from streams.consumer import consume_raw_jobs_once, consume_alerts
 from alerts.telegram import get_updates
 from alerts.bot_handler import handle_command
 from storage.db import init_db, get_pool
@@ -84,15 +84,24 @@ async def main():
     sched.start()
     logger.info("Scheduler started")
 
-    user_profiles = await load_user_profiles()
-
     asyncio.create_task(scrape_all())
 
     await asyncio.gather(
-        consume_raw_jobs(user_profiles),
+        _dynamic_consumer(),
         consume_alerts(),
         bot_polling_loop(),
     )
+
+
+async def _dynamic_consumer():
+    """Reload user profiles from DB every cycle."""
+    while True:
+        try:
+            user_profiles = await load_user_profiles()
+            await consume_raw_jobs_once(user_profiles)
+        except Exception as e:
+            logger.error(f"Dynamic consumer error: {e}")
+            await asyncio.sleep(3)
 
 
 if __name__ == "__main__":

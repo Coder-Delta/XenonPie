@@ -159,7 +159,7 @@ async def handle_command(chat_id: str, text: str):
     if cmd == "start":
         try:
             await save_user(chat_id=chat_id, name="user")
-            _subscribers.add(chat_id)
+            # do NOT auto-subscribe — user must explicitly set preferences and send /subscribe
         except Exception as e:
             logger.error(f"Save user error: {e}")
         await send_telegram_alert(WELCOME_TEXT, chat_id=chat_id)
@@ -180,12 +180,24 @@ async def handle_command(chat_id: str, text: str):
         await send_telegram_alert(msg, chat_id=chat_id)
 
     elif cmd == "subscribe":
-        _subscribers.add(chat_id)
         try:
             user = await get_user(chat_id) or {}
+            cats = user.get("categories") or []
+            states = user.get("states") or ["all_india"]
+            if not cats and states == ["all_india"]:
+                await send_telegram_alert(
+                    "⚠️ Please set your preferences first:\n\n"
+                    "/setstate west_bengal\n"
+                    "/setcategory bank\n"
+                    "/seteducation graduate\n\n"
+                    "Then send /subscribe again.",
+                    chat_id=chat_id
+                )
+                return
+            _subscribers.add(chat_id)
             await update_user_prefs(chat_id, {
-                "categories": user.get("categories") or [],
-                "states": user.get("states") or ["all_india"],
+                "categories": cats,
+                "states": states,
                 "education_level": user.get("education_level") or "graduate",
                 "subscribed": True,
             })
