@@ -1,53 +1,35 @@
 import hashlib
-import json
-from pathlib import Path
 from loguru import logger
-from typing import Optional
 
-HASH_STORE_PATH = Path(".cache/page_hashes.json")
+from storage.cache import get_client
 
-
-def _load_hashes() -> dict:
-    if HASH_STORE_PATH.exists():
-        with open(HASH_STORE_PATH) as f:
-            return json.load(f)
-    return {}
-
-
-def _save_hashes(hashes: dict):
-    HASH_STORE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with open(HASH_STORE_PATH, "w") as f:
-        json.dump(hashes, f, indent=2)
+HASH_KEY = "page_hashes"
 
 
 def compute_hash(content: str) -> str:
     return hashlib.sha256(content.encode()).hexdigest()
 
 
-def has_changed(url: str, current_content: str) -> bool:
-    hashes = _load_hashes()
+async def has_changed(url: str, current_content: str) -> bool:
+    r = await get_client()
     new_hash = compute_hash(current_content)
-    old_hash = hashes.get(url)
+    old_hash = await r.hget(HASH_KEY, url)
 
     if old_hash is None:
+        await r.hset(HASH_KEY, url, new_hash)
         logger.info(f"New URL tracked: {url}")
-        hashes[url] = new_hash
-        _save_hashes(hashes)
         return True
 
     if old_hash != new_hash:
+        await r.hset(HASH_KEY, url, new_hash)
         logger.info(f"Change detected: {url}")
-        hashes[url] = new_hash
-        _save_hashes(hashes)
         return True
 
     logger.debug(f"No change: {url}")
     return False
 
 
-def reset_hash(url: str):
-    hashes = _load_hashes()
-    if url in hashes:
-        del hashes[url]
-        _save_hashes(hashes)
-        logger.info(f"Hash reset for {url}")
+async def reset_hash(url: str) -> None:
+    r = await get_client()
+    await r.hdel(HASH_KEY, url)
+    logger.info(f"Hash reset for {url}")

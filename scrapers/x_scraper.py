@@ -3,10 +3,15 @@ from loguru import logger
 from typing import Optional
 
 from config.settings import settings
+from utils.http_client import get_http_client
+from utils.performance import metrics
+from utils.retry import retry
 
 BASE_URL = "https://api.x.com/2"
 
 
+@metrics.timed("scrape_x_user")
+@retry(max_attempts=3, initial_delay=0.5, max_delay=4.0, exceptions=(httpx.RequestError, httpx.HTTPStatusError))
 async def scrape_x_user(
     username: str,
     max_results: int = 20,
@@ -36,54 +41,46 @@ async def scrape_x_user(
     }
 
     try:
-        async with httpx.AsyncClient(
-            timeout=timeout,
+        client = await get_http_client()
+
+        user_resp = await client.get(
+            f"{BASE_URL}/users/by/username/{username}",
             headers=headers,
-            follow_redirects=True,
-        ) as client:
+            timeout=timeout,
+        )
+        user_resp.raise_for_status()
 
-            # Get user ID
-            user_resp = await client.get(
-                f"{BASE_URL}/users/by/username/{username}"
-            )
-            user_resp.raise_for_status()
+        user_data = user_resp.json()
 
-            user_data = user_resp.json()
+        if "data" not in user_data:
+            logger.warning(f"No user found: {username}")
+            return []
 
-            if "data" not in user_data:
-                logger.warning(f"No user found: {username}")
-                return []
+        user_id = user_data["data"]["id"]
 
-            user_id = user_data["data"]["id"]
+        tweets_resp = await client.get(
+            f"{BASE_URL}/users/{user_id}/tweets",
+            headers=headers,
+            params={
+                "max_results": min(max_results, 100),
+                "exclude": "replies,retweets",
+                "tweet.fields": "created_at,text",
+            },
+            timeout=timeout,
+        )
+        tweets_resp.raise_for_status()
 
-            # Get tweets
-            tweets_resp = await client.get(
-                f"{BASE_URL}/users/{user_id}/tweets",
-                params={
-                    "max_results": min(max_results, 100),
-                    "exclude": "replies,retweets",
-                    "tweet.fields": "created_at,text",
-                },
-            )
-
-            tweets_resp.raise_for_status()
-
-            tweets_data = tweets_resp.json()
-
-            tweets = []
-
-            for tweet in tweets_data.get("data", []):
-                tweets.append(
-                    {
-                        "id": tweet["id"],
-                        "username": username,
-                        "text": tweet["text"],
-                        "created_at": tweet.get("created_at"),
-                        "url": f"https://x.com/{username}/status/{tweet['id']}",
-                    }
-                )
-
-            return tweets
+        tweets_data = tweets_resp.json()
+        return [
+            {
+                "id": tweet["id"],
+                "username": username,
+                "text": tweet["text"],
+                "created_at": tweet.get("created_at"),
+                "url": f"https://x.com/{username}/status/{tweet['id']}",
+            }
+            for tweet in tweets_data.get("data", [])
+        ]
 
     except httpx.HTTPStatusError as e:
         logger.error(
@@ -100,6 +97,8 @@ async def scrape_x_user(
     return []
 
 
+@metrics.timed("scrape_x_post")
+@retry(max_attempts=3, initial_delay=0.5, max_delay=4.0, exceptions=(httpx.RequestError, httpx.HTTPStatusError))
 async def scrape_x_post(
     tweet_id: str,
     timeout: int = 30,
@@ -117,30 +116,29 @@ async def scrape_x_post(
     }
 
     try:
-        async with httpx.AsyncClient(
-            timeout=timeout,
+        client = await get_http_client()
+
+        response = await client.get(
+            f"{BASE_URL}/tweets/{tweet_id}",
             headers=headers,
-        ) as client:
+            params={
+                "tweet.fields": "created_at,text,public_metrics"
+            },
+            timeout=timeout,
+        )
 
-            response = await client.get(
-                f"{BASE_URL}/tweets/{tweet_id}",
-                params={
-                    "tweet.fields": "created_at,text,public_metrics"
-                },
-            )
+        response.raise_for_status()
 
-            response.raise_for_status()
+        data = response.json()["data"]
 
-            data = response.json()["data"]
-
-            return {
-                "id": data["id"],
-                "text": data["text"],
-                "created_at": data.get("created_at"),
-                "metrics": data.get("public_metrics", {}),
-                "url": f"https://x.com/i/web/status/{data['id']}",
-                "raw": data,
-            }
+        return {
+            "id": data["id"],
+            "text": data["text"],
+            "created_at": data.get("created_at"),
+            "metrics": data.get("public_metrics", {}),
+            "url": f"https://x.com/i/web/status/{data['id']}",
+            "raw": data,
+        }
 
     except httpx.HTTPStatusError as e:
         logger.error(

@@ -15,6 +15,12 @@ class Settings(BaseSettings):
     TWILIO_AUTH: str = ""
     RESEND_API_KEY: str = ""
     X_BEARER_TOKEN: str = ""
+    HEALTH_HOST: str = "0.0.0.0"
+    HEALTH_PORT: int = 8000
+    REDIS_MAX_CONNECTIONS: int = 20
+    HTTP_MAX_CONNECTIONS: int = 100
+    HTTP_MAX_KEEPALIVE_CONNECTIONS: int = 20
+    TELEGRAM_RATE_LIMIT_PER_SECOND: int = 1
 
 
 settings = Settings()

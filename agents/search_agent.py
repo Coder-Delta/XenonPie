@@ -1,12 +1,14 @@
+import asyncio
 import json
 from datetime import date
-from google import genai
 from loguru import logger
+
 from config.settings import settings
+from storage.cache import get_client
+from utils.performance import metrics
+from utils.retry import retry
 
-client = genai.Client(api_key=settings.GEMINI_API_KEY)
 _GEMINI_LIMIT = 15
-
 SEARCH_PROMPT = """
 You are a government job information finder for India.
 A job was found with this partial info:
@@ -33,13 +35,26 @@ Return ONLY JSON, no explanation.
 """
 
 
+async def _run_blocking(fn, *args, **kwargs):
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, lambda: fn(*args, **kwargs))
+
+
+def _clean_response(raw: str) -> dict | None:
+    raw = raw.strip().replace("```json", "").replace("```", "").strip()
+    if not raw:
+        return None
+    parsed = json.loads(raw)
+    if isinstance(parsed, list):
+        parsed = parsed[0] if parsed else None
+    return parsed
+
+
 async def _get_call_count() -> int:
     try:
-        import redis.asyncio as aioredis
-        r = await aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+        r = await get_client()
         today = date.today().isoformat()
         val = await r.get(f"gemini:calls:{today}")
-        await r.aclose()
         return int(val) if val else 0
     except Exception:
         return 0
@@ -47,16 +62,49 @@ async def _get_call_count() -> int:
 
 async def _increment_call_count() -> int:
     try:
-        import redis.asyncio as aioredis
-        r = await aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+        r = await get_client()
         today = date.today().isoformat()
         key = f"gemini:calls:{today}"
         count = await r.incr(key)
         await r.expire(key, 86400)
-        await r.aclose()
         return count
     except Exception:
         return 0
+
+
+@metrics.timed("enrich_gemini")
+@retry(max_attempts=3, initial_delay=0.5, max_delay=5.0)
+async def _enrich_gemini_prompt(prompt: str) -> dict | None:
+    try:
+        from google import genai
+        client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        response = await _run_blocking(
+            client.models.generate_content,
+            model="gemini-2.5-flash",
+            contents=prompt,
+        )
+        return _clean_response(response.text)
+    except Exception as e:
+        logger.error(f"Gemini enrichment error: {e}")
+        return None
+
+
+@metrics.timed("enrich_cohere")
+@retry(max_attempts=3, initial_delay=0.5, max_delay=5.0)
+async def _enrich_cohere_prompt(prompt: str) -> dict | None:
+    try:
+        import cohere
+        client = cohere.Client(api_key=settings.COHERE_API_KEY)
+        response = await _run_blocking(
+            client.chat,
+            model="command-r-plus-08-2024",
+            message=prompt,
+            temperature=0.1,
+        )
+        return _clean_response(response.text)
+    except Exception as e:
+        logger.error(f"Cohere enrichment error: {e}")
+        return None
 
 
 async def enrich_job_details(job: dict) -> dict:
@@ -64,7 +112,6 @@ async def enrich_job_details(job: dict) -> dict:
     org = job.get("organization") or ""
     category = job.get("category_tag") or ""
 
-    # check what's missing
     missing = []
     if not job.get("vacancies"):
         missing.append("vacancies")
@@ -84,80 +131,44 @@ async def enrich_job_details(job: dict) -> dict:
         logger.debug(f"Gemini daily limit ({_GEMINI_LIMIT}) reached, trying Cohere fallback: {title}")
         return await _enrich_cohere(job, missing)
 
+    prompt = SEARCH_PROMPT.format(title=title, organization=org, category=category)
     logger.info(f"Enriching {title} — missing: {missing}")
+    count = await _increment_call_count()
+    logger.debug(f"Gemini call {count}/{_GEMINI_LIMIT}")
 
-    try:
-        prompt = SEARCH_PROMPT.format(
-            title=title,
-            organization=org,
-            category=category,
-        )
-
-        count = await _increment_call_count()
-        logger.debug(f"Gemini call {count}/{_GEMINI_LIMIT}")
-
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-        )
-
-        raw = response.text.strip().replace("```json", "").replace("```", "").strip()
-        enriched = json.loads(raw)
-
-        # only fill missing fields, don't overwrite existing good data
-        for field in missing:
-            if enriched.get(field):
-                job[field] = enriched[field]
-                logger.debug(f"Enriched {field}: {enriched[field]}")
-
-        # add extra fields if found
-        for extra in ["exam_date", "selection_process", "official_website"]:
-            if enriched.get(extra):
-                job[extra] = enriched[extra]
-
-        logger.info(f"Enrichment done for {title}")
-        return job
-
-    except json.JSONDecodeError:
-        logger.warning(f"Gemini JSON parse failed for {title}")
+    enriched = await _enrich_gemini_prompt(prompt)
+    if not enriched:
         return await _enrich_cohere(job, missing)
-    except Exception as e:
-        logger.error(f"Search agent Gemini failed for {title}: {e}")
-        return await _enrich_cohere(job, missing)
+
+    for field in missing:
+        if enriched.get(field):
+            job[field] = enriched[field]
+            logger.debug(f"Enriched {field}: {enriched[field]}")
+
+    for extra in ["exam_date", "selection_process", "official_website"]:
+        if enriched.get(extra):
+            job[extra] = enriched[extra]
+
+    logger.info(f"Enrichment done for {title}")
+    return job
+
 
 async def _enrich_cohere(job: dict, missing: list) -> dict:
-    try:
-        import cohere
-        client = cohere.Client(api_key=settings.COHERE_API_KEY)
+    title = job.get("title") or ""
+    org = job.get("organization") or ""
+    prompt = SEARCH_PROMPT.format(title=title, organization=org, category=job.get("category_tag") or "")
 
-        title = job.get("title") or ""
-        org = job.get("organization") or ""
-
-        prompt = SEARCH_PROMPT.format(
-            title=title,
-            organization=org,
-            category=job.get("category_tag") or "",
-        )
-
-        response = client.chat(
-            model="command-r",
-            message=prompt,
-            temperature=0.1,
-        )
-        raw = response.text.strip().replace("```json", "").replace("```", "").strip()
-        enriched = json.loads(raw)
-
-        for field in missing:
-            if enriched.get(field):
-                job[field] = enriched[field]
-
-        for extra in ["exam_date", "selection_process", "official_website"]:
-            if enriched.get(extra):
-                job[extra] = enriched[extra]
-
-        logger.info(f"Cohere enrichment done for {title}")
+    enriched = await _enrich_cohere_prompt(prompt)
+    if not enriched:
         return job
 
-    except Exception as e:
-        logger.error(f"Cohere enrichment failed: {e}")
-        return job
+    for field in missing:
+        if enriched.get(field):
+            job[field] = enriched[field]
+
+    for extra in ["exam_date", "selection_process", "official_website"]:
+        if enriched.get(extra):
+            job[extra] = enriched[extra]
+
+    logger.info(f"Cohere enrichment done for {title}")
+    return job

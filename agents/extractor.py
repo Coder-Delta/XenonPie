@@ -1,7 +1,10 @@
-import json
 import asyncio
+import hashlib
+import json
 from loguru import logger
 from config.settings import settings
+from utils.performance import metrics
+from utils.retry import retry
 
 EXTRACT_PROMPT = """
 You are a government job notice parser for India.
@@ -25,32 +28,43 @@ Return ONLY valid JSON object, no explanation, no markdown.
 """
 
 
-# ── LLM 1: Groq ───────────────────────────────────────────────────────────────
+async def _run_blocking(fn, *args, **kwargs):
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, lambda: fn(*args, **kwargs))
 
+
+def _clean_response(raw: str) -> dict | None:
+    raw = raw.strip().replace("```json", "").replace("```", "").strip()
+    if not raw:
+        return None
+    parsed = json.loads(raw)
+    if isinstance(parsed, list):
+        parsed = parsed[0] if parsed else None
+    return parsed
+
+
+@metrics.timed("extract_groq")
+@retry(max_attempts=3, initial_delay=0.5, max_delay=4.0)
 async def _extract_groq(text: str) -> dict | None:
     try:
         from groq import Groq
         client = Groq(api_key=settings.GROQ_API_KEY)
         prompt = EXTRACT_PROMPT.format(text=text[:1500])
 
-        response = client.chat.completions.create(
+        response = await _run_blocking(
+            client.chat.completions.create,
             model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.1,
             max_tokens=800,
         )
-        raw = response.choices[0].message.content.strip()
-        raw = raw.replace("```json", "").replace("```", "").strip()
-
-        parsed = json.loads(raw)
-        if isinstance(parsed, list):
-            parsed = parsed[0] if parsed else None
+        raw = response.choices[0].message.content
+        parsed = _clean_response(raw)
         if not parsed:
             return None
 
         logger.info(f"Extracted [Groq]: {parsed.get('title')} — {parsed.get('organization')}")
         return parsed
-
     except Exception as e:
         error_str = str(e)
         if "rate_limit" in error_str or "429" in error_str:
@@ -62,29 +76,25 @@ async def _extract_groq(text: str) -> dict | None:
         return None
 
 
-# ── LLM 2: Gemini ─────────────────────────────────────────────────────────────
-
+@metrics.timed("extract_gemini")
+@retry(max_attempts=3, initial_delay=0.5, max_delay=5.0)
 async def _extract_gemini(text: str) -> dict | None:
     try:
         from google import genai
         client = genai.Client(api_key=settings.GEMINI_API_KEY)
         prompt = EXTRACT_PROMPT.format(text=text[:1500])
 
-        response = client.models.generate_content(
+        response = await _run_blocking(
+            client.models.generate_content,
             model="gemini-2.5-flash",
             contents=prompt,
         )
-        raw = response.text.strip().replace("```json", "").replace("```", "").strip()
-
-        parsed = json.loads(raw)
-        if isinstance(parsed, list):
-            parsed = parsed[0] if parsed else None
+        parsed = _clean_response(response.text)
         if not parsed:
             return None
 
         logger.info(f"Extracted [Gemini]: {parsed.get('title')} — {parsed.get('organization')}")
         return parsed
-
     except Exception as e:
         error_str = str(e)
         if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
@@ -96,30 +106,26 @@ async def _extract_gemini(text: str) -> dict | None:
         return None
 
 
-# ── LLM 3: Cohere ─────────────────────────────────────────────────────────────
-
+@metrics.timed("extract_cohere")
+@retry(max_attempts=3, initial_delay=0.5, max_delay=5.0)
 async def _extract_cohere(text: str) -> dict | None:
     try:
         import cohere
         client = cohere.Client(api_key=settings.COHERE_API_KEY)
         prompt = EXTRACT_PROMPT.format(text=text[:1500])
 
-        response = client.chat(
-            model="command-r",
+        response = await _run_blocking(
+            client.chat,
+            model="command-r-plus-08-2024",
             message=prompt,
             temperature=0.1,
         )
-        raw = response.text.strip().replace("```json", "").replace("```", "").strip()
-
-        parsed = json.loads(raw)
-        if isinstance(parsed, list):
-            parsed = parsed[0] if parsed else None
+        parsed = _clean_response(response.text)
         if not parsed:
             return None
 
         logger.info(f"Extracted [Cohere]: {parsed.get('title')} — {parsed.get('organization')}")
         return parsed
-
     except Exception as e:
         error_str = str(e)
         if "429" in error_str or "rate" in error_str.lower():
@@ -128,8 +134,6 @@ async def _extract_cohere(text: str) -> dict | None:
             logger.error(f"Cohere extractor error: {e}")
         return None
 
-
-# ── Main extractor with cascade ───────────────────────────────────────────────
 
 async def extract_job_details(text: str) -> dict | None:
     if not text or not text.strip():
@@ -148,14 +152,11 @@ async def extract_job_details(text: str) -> dict | None:
                 logger.debug(f"{name} returned result but no title, trying next")
         except Exception as e:
             logger.error(f"{name} cascade error: {e}")
-
         await asyncio.sleep(0.5)
 
     logger.warning("All LLMs failed for extraction")
     return None
 
-
-# ── Gemini fallback for search agent ──────────────────────────────────────────
 
 async def _fallback_gemini(text: str) -> dict | None:
     try:
@@ -163,17 +164,12 @@ async def _fallback_gemini(text: str) -> dict | None:
         client = genai.Client(api_key=settings.GEMINI_API_KEY)
         prompt = EXTRACT_PROMPT.format(text=text[:1500])
 
-        response = client.models.generate_content(
+        response = await _run_blocking(
+            client.models.generate_content,
             model="gemini-2.5-flash",
             contents=prompt,
         )
-        raw = response.text.strip().replace("```json", "").replace("```", "").strip()
-
-        parsed = json.loads(raw)
-        if isinstance(parsed, list):
-            parsed = parsed[0] if parsed else None
-        return parsed
-
+        return _clean_response(response.text)
     except Exception as e:
         logger.error(f"Gemini fallback error: {e}")
         return None

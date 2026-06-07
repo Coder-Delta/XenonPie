@@ -1,22 +1,7 @@
 import hashlib
-import json
-from pathlib import Path
 from loguru import logger
 
-DEDUP_STORE = Path(".cache/dedup_hashes.json")
-
-
-def _load() -> set:
-    if DEDUP_STORE.exists():
-        with open(DEDUP_STORE) as f:
-            return set(json.load(f))
-    return set()
-
-
-def _save(hashes: set):
-    DEDUP_STORE.parent.mkdir(parents=True, exist_ok=True)
-    with open(DEDUP_STORE, "w") as f:
-        json.dump(list(hashes), f)
+from storage.cache import is_seen, mark_seen
 
 
 def _job_fingerprint(job: dict) -> str:
@@ -27,15 +12,11 @@ def _job_fingerprint(job: dict) -> str:
     return hashlib.sha256(key.encode()).hexdigest()
 
 
-def is_duplicate(job: dict) -> bool:
-    hashes = _load()
+async def is_duplicate(job: dict) -> bool:
     fingerprint = _job_fingerprint(job)
-
-    if fingerprint in hashes:
+    if await is_seen(fingerprint):
         logger.debug(f"Duplicate skipped: {job.get('title')}")
         return True
-
-    hashes.add(fingerprint)
-    _save(hashes)
+    await mark_seen(fingerprint, ttl=604800)
     logger.info(f"New unique job: {job.get('title')}")
     return False

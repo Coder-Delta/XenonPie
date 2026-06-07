@@ -1,34 +1,23 @@
-import redis.asyncio as aioredis
-import json
 import asyncio
+import json
+from collections import defaultdict
 from loguru import logger
-from config.settings import settings
-from agents.supervisor import process_raw_job
 
-redis_client = None
+from storage.cache import get_client
+from agents.supervisor import process_raw_job
+from streams.producer import push_alert
 
 STREAM_RAW = "xenonpie:raw_jobs"
 STREAM_ALERTS = "xenonpie:alerts"
 GROUP_AGENTS = "agents_group"
 GROUP_ALERTS = "alerts_group"
 CONSUMER_NAME = "worker_1"
+RAW_BATCH_SIZE = 50
+ALERT_BATCH_SIZE = 50
 
 
-async def get_redis():
-    global redis_client
-    if redis_client is None:
-        redis_client = await aioredis.from_url(
-            settings.REDIS_URL,
-            encoding="utf-8",
-            decode_responses=True,
-            socket_timeout=30,
-            socket_connect_timeout=10,
-            retry_on_timeout=True,
-        )
-    return redis_client
-
-async def _ensure_groups():
-    r = await get_redis()
+async def _ensure_groups() -> None:
+    r = await get_client()
     for stream, group in [
         (STREAM_RAW, GROUP_AGENTS),
         (STREAM_ALERTS, GROUP_ALERTS),
@@ -37,11 +26,23 @@ async def _ensure_groups():
             await r.xgroup_create(stream, group, id="0", mkstream=True)
             logger.info(f"Created group '{group}' on '{stream}'")
         except Exception:
-            pass  # group already exists
+            pass
 
 
-async def consume_raw_jobs(user_profiles: list[dict], batch: int = 10):
-    r = await get_redis()
+async def _process_raw_message(msg_id: str, fields: dict, user_profiles: list[dict], r) -> None:
+    try:
+        raw = json.loads(fields["data"])
+        results = await process_raw_job(raw, user_profiles)
+        for job in results:
+            await push_alert(job)
+        await r.xack(STREAM_RAW, GROUP_AGENTS, msg_id)
+        logger.debug(f"ACK {msg_id} -> {len(results)} alerts queued")
+    except Exception as exc:
+        logger.error(f"Failed processing raw msg {msg_id}: {exc}")
+
+
+async def consume_raw_jobs(user_profiles: list[dict], batch: int = RAW_BATCH_SIZE) -> None:
+    r = await get_client()
     await _ensure_groups()
     logger.info("Raw jobs consumer started...")
 
@@ -59,32 +60,26 @@ async def consume_raw_jobs(user_profiles: list[dict], batch: int = 10):
                 await asyncio.sleep(1)
                 continue
 
-            for stream_name, entries in messages:
+            tasks = []
+            for _, entries in messages:
                 for msg_id, fields in entries:
-                    try:
-                        raw = json.loads(fields["data"])
-                        results = await process_raw_job(raw, user_profiles)
+                    tasks.append(
+                        asyncio.create_task(_process_raw_message(msg_id, fields, user_profiles, r))
+                    )
 
-                        from streams.producer import push_alert
-                        for job in results:
-                            await push_alert(job)
-
-                        await r.xack(STREAM_RAW, GROUP_AGENTS, msg_id)
-                        logger.debug(f"ACK {msg_id} → {len(results)} alerts queued")
-
-                    except Exception as e:
-                        logger.error(f"Failed processing msg {msg_id}: {e}")
+            if tasks:
+                await asyncio.gather(*tasks, return_exceptions=True)
 
         except asyncio.CancelledError:
             logger.info("Consumer shutting down...")
             break
-        except Exception as e:
-            logger.error(f"Consumer loop error: {e}")
+        except Exception as exc:
+            logger.error(f"Consumer loop error: {exc}")
             await asyncio.sleep(3)
 
 
-async def consume_raw_jobs_once(user_profiles: list[dict], batch: int = 10):
-    r = await get_redis()
+async def consume_raw_jobs_once(user_profiles: list[dict], batch: int = RAW_BATCH_SIZE) -> None:
+    r = await get_client()
     await _ensure_groups()
 
     try:
@@ -99,34 +94,28 @@ async def consume_raw_jobs_once(user_profiles: list[dict], batch: int = 10):
         if not messages:
             return
 
-        for stream_name, entries in messages:
+        for _, entries in messages:
+            tasks = []
             for msg_id, fields in entries:
-                try:
-                    raw = json.loads(fields["data"])
-                    results = await process_raw_job(raw, user_profiles)
-
-                    from streams.producer import push_alert
-                    for job in results:
-                        await push_alert(job)
-
-                    await r.xack(STREAM_RAW, GROUP_AGENTS, msg_id)
-
-                except Exception as e:
-                    logger.error(f"Failed processing msg {msg_id}: {e}")
+                tasks.append(
+                    asyncio.create_task(_process_raw_message(msg_id, fields, user_profiles, r))
+                )
+            if tasks:
+                await asyncio.gather(*tasks, return_exceptions=True)
 
     except asyncio.CancelledError:
         raise
-    except Exception as e:
-        logger.error(f"consume_raw_jobs_once error: {e}")
+    except Exception as exc:
+        logger.error(f"consume_raw_jobs_once error: {exc}")
         await asyncio.sleep(3)
 
 
-async def consume_alerts():
+async def consume_alerts() -> None:
     from alerts.formatter import format_alert
     from alerts.telegram import send_telegram_alert
     from storage.billing import can_receive_alert, increment_alert_count
 
-    r = await get_redis()
+    r = await get_client()
     await _ensure_groups()
     logger.info("Alerts consumer started...")
 
@@ -136,7 +125,7 @@ async def consume_alerts():
                 groupname=GROUP_ALERTS,
                 consumername=CONSUMER_NAME,
                 streams={STREAM_ALERTS: ">"},
-                count=5,
+                count=ALERT_BATCH_SIZE,
                 block=2000,
             )
 
@@ -144,41 +133,62 @@ async def consume_alerts():
                 await asyncio.sleep(1)
                 continue
 
-            for stream_name, entries in messages:
+            user_jobs: dict[str, list[tuple[str, dict]]] = defaultdict(list)
+            ack_ids: list[str] = []
+
+            for _, entries in messages:
                 for msg_id, fields in entries:
                     try:
                         job = json.loads(fields["data"])
                         chat_id = job.get("user_id")
-
                         if not chat_id:
-                            await r.xack(STREAM_ALERTS, GROUP_ALERTS, msg_id)
+                            ack_ids.append(msg_id)
                             continue
 
                         allowed, reason = await can_receive_alert(chat_id)
                         if not allowed:
                             logger.info(f"Alert blocked for {chat_id} — limit reached")
                             await send_telegram_alert(message=reason, chat_id=chat_id)
-                            await r.xack(STREAM_ALERTS, GROUP_ALERTS, msg_id)
+                            ack_ids.append(msg_id)
                             continue
 
-                        message = format_alert(job)
-                        sent = await send_telegram_alert(
-                            message=message,
-                            chat_id=chat_id
-                        )
+                        user_jobs[chat_id].append((msg_id, job))
+                    except Exception as exc:
+                        logger.error(f"Failed parsing alert msg {msg_id}: {exc}")
+                        ack_ids.append(msg_id)
 
-                        if sent:
-                            await increment_alert_count(chat_id)
+            for chat_id, jobs in user_jobs.items():
+                assembled = []
+                current = []
+                current_len = 0
+                for _, job in jobs:
+                    text = format_alert(job)
+                    if current_len + len(text) + 2 > 3800:
+                        assembled.append("\n\n".join(current))
+                        current = [text]
+                        current_len = len(text)
+                    else:
+                        current.append(text)
+                        current_len += len(text) + 2
+                if current:
+                    assembled.append("\n\n".join(current))
 
-                        await r.xack(STREAM_ALERTS, GROUP_ALERTS, msg_id)
-                        logger.debug(f"Alert sent + ACK {msg_id}")
+                sent_count = 0
+                for message in assembled:
+                    sent = await send_telegram_alert(message=message, chat_id=chat_id)
+                    if sent:
+                        sent_count += 1
+                if sent_count > 0:
+                    await increment_alert_count(chat_id)
+                ack_ids.extend([msg_id for msg_id, _ in jobs])
 
-                    except Exception as e:
-                        logger.error(f"Alert delivery failed {msg_id}: {e}")
+            if ack_ids:
+                await r.xack(STREAM_ALERTS, GROUP_ALERTS, *ack_ids)
+                logger.debug(f"Alert batch ACKed {len(ack_ids)} messages")
 
         except asyncio.CancelledError:
             logger.info("Alert consumer shutting down...")
             break
-        except Exception as e:
-            logger.error(f"Alert consumer error: {e}")
+        except Exception as exc:
+            logger.error(f"Alert consumer error: {exc}")
             await asyncio.sleep(3)

@@ -56,7 +56,7 @@ async def process_raw_job(
             pass
 
     # Step 4: Dedup
-    if is_duplicate(job):
+    if await is_duplicate(job):
         return []
 
     # Step 5: Rank for users

@@ -1,34 +1,42 @@
-import redis.asyncio as aioredis
 import json
+from datetime import date
+from typing import Any
+
+import redis.asyncio as aioredis
 from loguru import logger
+
 from config.settings import settings
 
-_client = None
+_client: aioredis.Redis | None = None
 
 
-async def get_client():
+async def get_client() -> aioredis.Redis:
     global _client
     if _client is None:
         _client = await aioredis.from_url(
             settings.REDIS_URL,
             encoding="utf-8",
             decode_responses=True,
+            max_connections=20,
+            socket_timeout=1,
+            socket_connect_timeout=1,
+            retry_on_timeout=True,
         )
-        logger.info("Redis cache client created")
+        logger.info("Redis connection pool initialized")
     return _client
 
 
-async def close_client():
+async def close_client() -> None:
     global _client
-    if _client:
+    if _client is not None:
         await _client.aclose()
         _client = None
-        logger.info("Redis cache client closed")
+        logger.info("Redis connection pool closed")
 
 
 # ── generic get/set/delete ─────────────────────────────────────────────────────
 
-async def set(key: str, value, ttl: int = None) -> bool:
+async def set(key: str, value: Any, ttl: int | None = None) -> bool:
     try:
         r = await get_client()
         data = json.dumps(value) if not isinstance(value, str) else value
@@ -42,7 +50,7 @@ async def set(key: str, value, ttl: int = None) -> bool:
         return False
 
 
-async def get(key: str):
+async def get(key: str) -> Any | None:
     try:
         r = await get_client()
         data = await r.get(key)
@@ -76,14 +84,42 @@ async def exists(key: str) -> bool:
         return False
 
 
+# ── hash helpers for change detection ────────────────────────────────────────────
+
+async def hget(hash_name: str, field: str) -> Any | None:
+    try:
+        r = await get_client()
+        data = await r.hget(hash_name, field)
+        if data is None:
+            return None
+        try:
+            return json.loads(data)
+        except json.JSONDecodeError:
+            return data
+    except Exception as e:
+        logger.error(f"HGET error [{hash_name}:{field}]: {e}")
+        return None
+
+
+async def hset(hash_name: str, field: str, value: Any) -> bool:
+    try:
+        r = await get_client()
+        data = json.dumps(value) if not isinstance(value, str) else value
+        await r.hset(hash_name, field, data)
+        return True
+    except Exception as e:
+        logger.error(f"HSET error [{hash_name}:{field}]: {e}")
+        return False
+
+
 # ── rate limiting ──────────────────────────────────────────────────────────────
 
 async def is_rate_limited(key: str, limit: int, window: int) -> bool:
     try:
         r = await get_client()
         pipe = r.pipeline()
-        await pipe.incr(key)
-        await pipe.expire(key, window)
+        pipe.incr(key)
+        pipe.expire(key, window)
         results = await pipe.execute()
         count = results[0]
         return count > limit
@@ -92,7 +128,7 @@ async def is_rate_limited(key: str, limit: int, window: int) -> bool:
         return False
 
 
-# ── job-specific helpers ───────────────────────────────────────────────────────
+# ── job-specific helpers ──────────────────────────────────────────────────────────────
 
 async def cache_job(fingerprint: str, job: dict, ttl: int = 86400) -> bool:
     return await set(f"job:{fingerprint}", job, ttl=ttl)
@@ -113,7 +149,7 @@ async def get_user_prefs(chat_id: str) -> dict | None:
 async def increment_alert_count(chat_id: str) -> int:
     try:
         r = await get_client()
-        today = __import__("datetime").date.today().isoformat()
+        today = date.today().isoformat()
         key = f"alerts:{chat_id}:{today}"
         count = await r.incr(key)
         await r.expire(key, 86400)
@@ -125,14 +161,15 @@ async def increment_alert_count(chat_id: str) -> int:
 
 async def get_alert_count(chat_id: str) -> int:
     try:
-        today = __import__("datetime").date.today().isoformat()
+        today = date.today().isoformat()
         result = await get(f"alerts:{chat_id}:{today}")
         return int(result) if result else 0
-    except Exception:
+    except Exception as e:
+        logger.error(f"Get alert count error: {e}")
         return 0
 
 
-# ── dedup helpers (fast Redis-based) ──────────────────────────────────────────
+# ── dedup helpers (fast Redis-based) ──────────────────────────────────────────────────────────
 
 async def mark_seen(fingerprint: str, ttl: int = 604800) -> bool:
     try:

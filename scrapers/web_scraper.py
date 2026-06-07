@@ -3,18 +3,23 @@ from bs4 import BeautifulSoup
 from loguru import logger
 from typing import Optional
 
+from utils.http_client import get_http_client
+from utils.performance import metrics
+from utils.retry import retry
 
+
+@metrics.timed("scrape_url")
+@retry(max_attempts=3, initial_delay=0.5, max_delay=4.0, exceptions=(httpx.RequestError, httpx.HTTPStatusError))
 async def scrape_url(url: str, timeout: int = 30) -> Optional[dict]:
     headers = {
         "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"
     }
     try:
-        async with httpx.AsyncClient(timeout=timeout, headers=headers, follow_redirects=True) as client:
-            response = await client.get(url)
-            response.raise_for_status()
+        client = await get_http_client()
+        response = await client.get(url, headers=headers, timeout=timeout)
+        response.raise_for_status()
 
         soup = BeautifulSoup(response.text, "html.parser")
-
         return {
             "url": url,
             "title": soup.title.string.strip() if soup.title else "",

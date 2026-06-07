@@ -1,16 +1,24 @@
 import asyncio
+import time
+from collections import defaultdict
+from urllib.parse import urlparse
+
 from loguru import logger
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 from scrapers import scrape_url, parse_feed, has_changed
 from scrapers.x_scraper import scrape_x_user, extract_hiring_posts
 from streams.producer import push_raw_job
-from storage.db import init_db, get_recent_jobs
+from storage.db import get_recent_jobs
 from storage.cache import get_client
 import yaml
 
 scheduler = AsyncIOScheduler(timezone="Asia/Kolkata")
+
+SOURCE_SEMAPHORE = asyncio.Semaphore(20)
+DOMAIN_DELAY_SECONDS = 0.15
+_last_request_at: dict[str, float] = defaultdict(lambda: 0.0)
 
 
 def load_sources():
@@ -21,39 +29,69 @@ def load_sources():
 
 # ── scrape all sources ─────────────────────────────────────────────────────────
 
-async def scrape_all():
-    sources = load_sources()
-    logger.info(f"Scrape cycle started — {len(sources)} sources")
+async def _throttle_domain(url: str) -> None:
+    domain = urlparse(url).netloc
+    now = time.monotonic()
+    elapsed = now - _last_request_at[domain]
+    if elapsed < DOMAIN_DELAY_SECONDS:
+        await asyncio.sleep(DOMAIN_DELAY_SECONDS - elapsed)
+    _last_request_at[domain] = time.monotonic()
+
+
+async def _scrape_source(source: dict) -> tuple[int, int]:
     success = 0
     failed = 0
-
-    for source in sources:
-        try:
-            if source["type"] == "web":
-                result = await scrape_url(source["url"])
-                if result and has_changed(source["url"], result["raw_html"]):
+    try:
+        async with SOURCE_SEMAPHORE:
+            source_type = source.get("type")
+            if source_type == "web":
+                url = source["url"]
+                await _throttle_domain(url)
+                result = await scrape_url(url)
+                if result and await has_changed(url, result["raw_html"]):
                     await push_raw_job(result)
                     success += 1
 
-            elif source["type"] == "feed":
-                entries = parse_feed(source["url"])
+            elif source_type == "feed":
+                url = source["url"]
+                await _throttle_domain(url)
+                entries = await parse_feed(url)
                 for entry in entries:
-                    if has_changed(entry["link"], entry["summary"]):
+                    if await has_changed(entry["link"], entry["summary"]):
                         await push_raw_job(entry)
                         success += 1
 
-            elif source["type"] == "x":
-                posts = await scrape_x_user(source.get("username", ""))
+            elif source_type == "x":
+                username = source.get("username", "")
+                posts = await scrape_x_user(username)
                 for post in extract_hiring_posts(posts):
-                    if has_changed(post["url"], post["text"]):
+                    if await has_changed(post["url"], post["text"]):
                         post["source"] = source.get("name", "")
                         post["source_type"] = "x"
                         await push_raw_job(post)
                         success += 1
 
-        except Exception as e:
+    except Exception as e:
+        failed += 1
+        logger.error(f"Scrape failed [{source.get('url') or source.get('username')}]: {e}")
+    return success, failed
+
+
+async def scrape_all():
+    sources = load_sources()
+    logger.info(f"Scrape cycle started — {len(sources)} sources")
+    tasks = [asyncio.create_task(_scrape_source(source)) for source in sources]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    success = 0
+    failed = 0
+    for result in results:
+        if isinstance(result, Exception):
             failed += 1
-            logger.error(f"Scrape failed [{source.get('url') or source.get('username')}]: {e}")
+            logger.error(f"Scrape task failed: {result}")
+        else:
+            success += result[0]
+            failed += result[1]
 
     logger.info(f"Scrape cycle done — pushed: {success} | failed: {failed}")
 

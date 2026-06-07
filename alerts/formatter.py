@@ -1,23 +1,30 @@
 from datetime import datetime, date
+import html
+
+
+def _safe(text) -> str:
+    if not text or text == "N/A":
+        return "N/A"
+    return html.escape(str(text))
 
 
 def format_alert(job: dict) -> str:
-    title = job.get("title") or "Unknown Post"
-    org = job.get("organization") or "N/A"
-    vacancies = job.get("vacancies") or "N/A"
-    eligibility = job.get("eligibility") or "N/A"
+    title = _safe(job.get("title") or "Unknown Post")
+    org = _safe(job.get("organization") or "N/A")
+    vacancies = _safe(job.get("vacancies") or "N/A")
+    eligibility = _safe(job.get("eligibility") or "N/A")
     last_date = job.get("last_date") or "N/A"
-    location = job.get("location") or "N/A"
-    salary = job.get("salary") or "N/A"
+    location = _safe(job.get("location") or "N/A")
+    salary = _safe(job.get("salary") or "N/A")
     apply_link = job.get("apply_link") or job.get("source_url") or ""
-    category = (job.get("category_tag") or "").replace("_", " ").title()
+    category = _safe((job.get("category_tag") or "").replace("_", " ").title())
     score = job.get("relevance_score", 0)
 
-    # Urgency tag
+    # urgency tag
     urgency = ""
     if last_date and last_date != "N/A":
         try:
-            deadline = datetime.fromisoformat(last_date).date()
+            deadline = datetime.fromisoformat(str(last_date)).date()
             days_left = (deadline - date.today()).days
             if days_left < 0:
                 urgency = "⚫ EXPIRED\n"
@@ -36,13 +43,16 @@ def format_alert(job: dict) -> str:
 🏛 <b>{title}</b>
 🏢 {org}
 📂 {category}
+
 👥 Vacancies: {vacancies}
 🎓 Eligibility: {eligibility}
 📍 Location: {location}
 💰 Salary: {salary}
-📅 Last Date: {last_date}
+📅 Last Date: {_safe(last_date)}
 {urgency}
 ⭐ Match Score: {score}/100
+
 🔗 {apply_link}
 """.strip()
+
     return message
