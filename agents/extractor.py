@@ -1,6 +1,7 @@
 import asyncio
 import hashlib
 import json
+import httpx
 from loguru import logger
 from config.settings import settings
 from utils.performance import metrics
@@ -68,9 +69,9 @@ async def _extract_groq(text: str) -> dict | None:
     except Exception as e:
         error_str = str(e)
         if "rate_limit" in error_str or "429" in error_str:
-            logger.warning("Groq rate limit hit, trying Gemini fallback")
+            logger.warning("Groq failed, trying Gemini...")
         elif "decommissioned" in error_str:
-            logger.warning("Groq model decommissioned, trying Gemini")
+            logger.warning("Groq failed, trying Gemini...")
         else:
             logger.error(f"Groq extractor error: {e}")
         return None
@@ -98,9 +99,9 @@ async def _extract_gemini(text: str) -> dict | None:
     except Exception as e:
         error_str = str(e)
         if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
-            logger.warning("Gemini quota exhausted, trying Cohere fallback")
+            logger.warning("Gemini failed, trying xAI Grok...")
         elif "503" in error_str or "UNAVAILABLE" in error_str:
-            logger.warning("Gemini unavailable, trying Cohere fallback")
+            logger.warning("Gemini failed, trying xAI Grok...")
         else:
             logger.error(f"Gemini extractor error: {e}")
         return None
@@ -135,6 +136,59 @@ async def _extract_cohere(text: str) -> dict | None:
         return None
 
 
+@metrics.timed("extract_xai")
+@retry(max_attempts=3, initial_delay=0.5, max_delay=5.0)
+async def _extract_xai(text: str) -> dict | None:
+    try:
+        if not settings.XAI_API_KEY:
+            logger.warning("XAI_API_KEY not configured, skipping xAI Grok")
+            return None
+
+        prompt = EXTRACT_PROMPT.format(text=text[:1500])
+        headers = {
+            "Authorization": f"Bearer {settings.XAI_API_KEY}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": "grok-3-mini",
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 800,
+        }
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                "https://api.x.ai/v1/chat/completions",
+                headers=headers,
+                json=payload,
+            )
+            response.raise_for_status()
+            data = response.json()
+            raw = data["choices"][0]["message"]["content"]
+            parsed = _clean_response(raw)
+            if not parsed:
+                return None
+
+            logger.info(f"Extracted [xAI Grok]: {parsed.get('title')} — {parsed.get('organization')}")
+            return parsed
+    except httpx.HTTPStatusError as e:
+        error_str = str(e.status_code)
+        if "429" in error_str or e.status_code == 429:
+            logger.warning("xAI Grok rate limit hit")
+        elif "503" in error_str or e.status_code == 503:
+            logger.warning("xAI Grok service unavailable")
+        elif "401" in error_str or e.status_code == 401:
+            logger.error("xAI Grok authentication failed (invalid XAI_API_KEY)")
+        else:
+            logger.error(f"xAI Grok HTTP error {e.status_code}: {e}")
+        return None
+    except httpx.RequestError as e:
+        logger.error(f"xAI Grok request error: {e}")
+        return None
+    except Exception as e:
+        logger.error(f"xAI Grok extractor error: {e}")
+        return None
+
+
 async def extract_job_details(text: str) -> dict | None:
     if not text or not text.strip():
         return None
@@ -142,7 +196,7 @@ async def extract_job_details(text: str) -> dict | None:
     for name, extractor in [
         ("Groq", _extract_groq),
         ("Gemini", _extract_gemini),
-        ("Cohere", _extract_cohere),
+        ("xAI Grok", _extract_xai),
     ]:
         try:
             result = await extractor(text)
@@ -154,7 +208,7 @@ async def extract_job_details(text: str) -> dict | None:
             logger.error(f"{name} cascade error: {e}")
         await asyncio.sleep(0.5)
 
-    logger.warning("All LLMs failed for extraction")
+    logger.error("All LLMs failed for extraction")
     return None
 
 

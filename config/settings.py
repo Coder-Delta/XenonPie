@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
     COHERE_API_KEY: str = ""
+    XAI_API_KEY: str = ""
     REDIS_URL: str = "redis://127.0.0.1:6379"
     DATABASE_URL: str = "postgresql+asyncpg://xenonpie:xenonpie123@localhost/xenonpie"
     TELEGRAM_BOT_TOKEN: str = ""
